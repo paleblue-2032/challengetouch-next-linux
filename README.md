@@ -1,4 +1,4 @@
-# Challenge Pad NEXT に Linux を入れる (challengetouch-next-linux)
+# Challenge Touch NEXT に Linux を入れる (challengetouch-next-linux)
 
 Benesse「チャレンジパッド NEXT」こと **TAB-A05-BA1**（codename `a05ba`, MediaTek MT8168A）で、
 Android を消さずに **recovery スロットへ自作 Linux を焼いて起動**し、
