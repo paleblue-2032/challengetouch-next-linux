@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Open the Challenge Pad Linux USB ACM console and run shell commands.
+"""Open the Challenge Touch Linux USB ACM console and run shell commands.
 
 Waits for the shell prompt after each command so that slow commands
 (apk update/add, network fetches) are captured reliably.

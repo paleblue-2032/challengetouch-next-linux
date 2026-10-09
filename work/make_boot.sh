@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Pack a Linux-bootable boot.img for the Challenge Pad NEXT:
+# Pack a Linux-bootable boot.img for the Challenge Touch NEXT:
 #   stock (working) kernel + appended Next DTB  +  custom Linux initramfs.
 # Non-destructive test:  fastboot boot work/boot_linux_test.img
 set -euo pipefail

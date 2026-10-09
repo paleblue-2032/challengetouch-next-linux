@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build and boot Linux on the Challenge Pad NEXT (a05ba).
+# Build and boot Linux on the Challenge Touch NEXT (a05ba).
 # Achieves: Linux 4.14 boots, root shell over the USB ACM console (/dev/ttyACM0).
 set -u
 BASE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; cd "$BASE"

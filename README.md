@@ -1,6 +1,6 @@
 # Challenge Touch NEXT に Linux を入れる (challengetouch-next-linux)
 
-Benesse「チャレンジパッド NEXT」こと **TAB-A05-BA1**（codename `a05ba`, MediaTek MT8168A）で、
+Benesse「チャレンジタッチ NEXT」こと **TAB-A05-BA1**（codename `a05ba`, MediaTek MT8168A）で、
 Android を消さずに **recovery スロットへ自作 Linux を焼いて起動**し、
 **microSD 上の永続 Alpine rootfs + X デスクトップ**を自動起動させるまでの作業メモと一式です。
 
@@ -9,7 +9,7 @@ Android を消さずに **recovery スロットへ自作 Linux を焼いて起�
 
 ```
  +--------------------+        USB (RNDIS)         +----------------------+
- | ホスト PC (Linux)   | <=== 10.0.0.1 <-> 10.0.0.2 ==> | チャレンジパッド NEXT |
+ | ホスト PC (Linux)   | <=== 10.0.0.1 <-> 10.0.0.2 ==> | チャレンジタッチ NEXT |
  |                    |        + ACM serial          |  recovery slot: Linux |
  +--------------------+                              +----------+-----------+
                                                                 |
