@@ -23,10 +23,18 @@ mount -t tmpfs none /tmp 2>/dev/null
 mount -t configfs none /sys/kernel/config 2>/dev/null
 
 SD=0
-for i in $(seq 1 20); do
-	mount -t ext4 -o rw /dev/mmcblk1p1 /mnt/sd 2>/dev/null && { SD=1; break; }
+for i in $(seq 1 90); do
+	busybox mdev -s 2>/dev/null
+	if mount -t ext4 -o rw /dev/mmcblk1p1 /mnt/sd 2>/tmp/sdmnt.err; then SD=1; break; fi
+	if [ $((i % 5)) -eq 0 ]; then
+		echo "[ct-next] SD wait $i: $(cat /tmp/sdmnt.err 2>/dev/null)" > /dev/kmsg
+		echo 1 > /sys/block/mmcblk1/device/rescan 2>/dev/null
+	fi
 	sleep 1
 done
+if [ "$SD" = 0 ]; then
+	echo "[ct-next] SD mount FAILED after retries: $(cat /tmp/sdmnt.err 2>/dev/null)" > /dev/kmsg
+fi
 SDLOG=""
 [ "$SD" = 1 ] && { SDLOG=/mnt/sd/ct-next-linux.log; : > "$SDLOG" 2>/dev/null; }
 log() {
