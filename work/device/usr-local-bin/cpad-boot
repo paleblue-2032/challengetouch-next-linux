@@ -111,6 +111,27 @@ Icon=utilities-terminal
 Categories=System;
 DESK
 
+# Power menu launchers. GNOME's own power actions go through systemd (absent
+# here), so provide explicit ones that use elogind (loginctl).
+cat > /usr/share/applications/cpad-shutdown.desktop <<'DESK'
+[Desktop Entry]
+Type=Application
+Name=Shutdown
+Comment=Power off (elogind)
+Exec=loginctl poweroff
+Icon=system-shutdown
+Categories=System;
+DESK
+cat > /usr/share/applications/cpad-reboot.desktop <<'DESK'
+[Desktop Entry]
+Type=Application
+Name=Reboot
+Comment=Restart (elogind)
+Exec=loginctl reboot
+Icon=system-reboot
+Categories=System;
+DESK
+
 # On-screen keyboard (the tablet has no physical keyboard). Big keys docked at
 # the bottom of the 1200x1920 panel.
 mkdir -p /etc/xdg/autostart
