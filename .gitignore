@@ -1,0 +1,49 @@
+# ===========================================================================
+# Large third-party firmware, device backups and upstream git clones.
+# None of these are needed to reproduce the Linux boot.
+# See README.md -> "リポジトリに含まれないもの" for how to obtain them.
+# ===========================================================================
+
+# Stock firmware / ROM images (proprietary, hundreds of MB each)
+/REDACTED/
+/backup/
+/REDACTED_Next_v2.0.0.zip
+
+# Upstream kernel sources and tools (plain git clones; re-fetch by URL)
+/a05ba-kernel/
+/mouseos-a05bd-kernel/
+/mtkclient/
+
+# Local agent configuration (not part of the project)
+/.commandcode/
+
+# ===========================================================================
+# work/  — keep only the small, essential build inputs and the final image
+# ===========================================================================
+/work/*
+!/work/device/
+!/work/initramfs-root/
+!/work/remote/
+!/work/linux_v9.img
+!/work/initramfs_alpine_v9.cpio.gz
+!/work/busybox-aarch64
+!/work/push_device.sh
+!/work/ssh.sh
+!/work/enter_fastboot.sh
+!/work/mtk-bootseq.py
+!/work/make_boot.sh
+!/work/serial_cmd.py
+!/work/serial_put.py
+!/work/serial_getb64.py
+!/work/twrp_cmdline.txt
+!/work/twrp_appended.dtb
+!/work/twrp_recovery_dtbo.bin
+
+# Copied from work/busybox-aarch64 by the build scripts at build time
+/work/initramfs-root/bin/
+
+# ===========================================================================
+# twrp/  — keep only the base image that build_linux_img.sh patches
+# ===========================================================================
+/twrp/*
+!/twrp/a05ba-tate.img

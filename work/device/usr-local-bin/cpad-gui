@@ -1,0 +1,60 @@
+#!/bin/sh
+# Keep a minimal X desktop (Xorg + icewm + xterm) alive on the DSI panel.
+# Uses explicit PIDs (pgrep does not reliably see "Xorg" on this kernel) and a
+# pidfile so only one supervisor ever runs.
+export PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+export DISPLAY=:0
+LOG=/var/log/cpad-gui.log
+PIDFILE=/run/cpad-gui.pid
+log() { echo "$(date '+%H:%M:%S') $*" >>"$LOG"; }
+mkdir -p /tmp/.X11-unix /var/log /run
+
+if [ -f "$PIDFILE" ]; then
+	old=$(cat "$PIDFILE" 2>/dev/null)
+	if [ -n "$old" ] && kill -0 "$old" 2>/dev/null; then
+		log "supervisor already running ($old)"
+		exit 0
+	fi
+fi
+echo $$ >"$PIDFILE"
+
+XPID=""
+IPID=""
+TPID=""
+alive() { [ -n "$1" ] && kill -0 "$1" 2>/dev/null; }
+
+start_x() {
+	rm -f /tmp/.X0-lock
+	rm -rf /tmp/.X11-unix
+	mkdir -p /tmp/.X11-unix
+	Xorg :0 -logfile /var/log/Xorg.0.log >>"$LOG" 2>&1 &
+	XPID=$!
+	i=0
+	while [ ! -S /tmp/.X11-unix/X0 ] && [ "$i" -lt 30 ]; do
+		sleep 1
+		i=$((i + 1))
+	done
+	log "Xorg up (pid $XPID) after ${i}s"
+	xsetroot -solid '#0b2436' 2>/dev/null
+}
+
+while :; do
+	alive "$XPID" || start_x
+
+	if ! alive "$IPID"; then
+		icewm-session >>"$LOG" 2>&1 &
+		IPID=$!
+		log "icewm-session started (pid $IPID)"
+	fi
+
+	sleep 3
+
+	if ! alive "$TPID"; then
+		xterm -geometry 84x46 -fa 'Noto Sans Mono CJK JP' -fs 13 \
+			-bg '#0b0b0b' -fg '#e6e6e6' -title cpad >>"$LOG" 2>&1 &
+		TPID=$!
+		log "xterm started (pid $TPID)"
+	fi
+
+	sleep 7
+done

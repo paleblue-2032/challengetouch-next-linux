@@ -1,0 +1,41 @@
+#!/bin/sh
+# Runs INSIDE the Alpine chroot (SD rootfs), launched by the initramfs init.
+# Brings up udev, the RNDIS network, SSH and the X desktop.
+# Edit this file on the SD card; no reflash needed.
+export PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+LOG=/var/log/cpad-boot.log
+log() { echo "$(date '+%H:%M:%S') $*" >>"$LOG"; }
+mkdir -p /var/log /tmp/.X11-unix
+
+# ---- udev: X needs it to enumerate input devices --------------------------
+mkdir -p /run/udev
+if ! pgrep -x udevd >/dev/null 2>&1; then
+	/sbin/udevd --daemon 2>>"$LOG" && log "udevd started"
+fi
+/sbin/udevadm trigger --action=add 2>>"$LOG"
+/sbin/udevadm settle 2>>"$LOG"
+
+# ---- network: the RNDIS gadget is set up by the initramfs init ------------
+for n in rndis0 usb0; do
+	[ -d "/sys/class/net/$n" ] || continue
+	ip link set "$n" up 2>/dev/null
+	ip addr add 10.0.0.2/24 dev "$n" 2>/dev/null
+	ip route add default via 10.0.0.1 dev "$n" 2>/dev/null
+	log "net $n up"
+done
+printf 'nameserver 192.168.11.1\nnameserver 1.1.1.1\n' >/etc/resolv.conf
+printf 'cpad-linux\n' >/etc/hostname
+printf '127.0.0.1 localhost cpad-linux\n' >/etc/hosts
+
+# ---- ssh over the RNDIS link ----------------------------------------------
+mkdir -p /etc/dropbear
+[ -f /etc/dropbear/dropbear_ed25519_host_key ] || dropbearkey -t ed25519 -f /etc/dropbear/dropbear_ed25519_host_key >>"$LOG" 2>&1
+[ -f /etc/dropbear/dropbear_rsa_host_key ] || dropbearkey -t rsa -s 2048 -f /etc/dropbear/dropbear_rsa_host_key >>"$LOG" 2>&1
+if ! pgrep -x dropbear >/dev/null 2>&1; then
+	/usr/sbin/dropbear -p 22 2>>"$LOG" && log "dropbear started"
+fi
+
+# ---- X desktop (cpad-gui self-guards against double start) -----------------
+setsid /usr/local/bin/cpad-gui >>"$LOG" 2>&1 &
+log "cpad-gui launched"
+log "cpad-boot done"

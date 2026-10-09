@@ -1,0 +1,109 @@
+#!/bin/busybox sh
+# Linux init v9: persistent Alpine rootfs on the microSD (ext4), entered via chroot.
+# Adds over v8: a proper /dev/pts inside the chroot (so X terminals work) and a
+# call into /usr/local/bin/cpad-boot (udev + ssh + X desktop), which lives on the
+# SD card and can be edited without reflashing.
+/bin/busybox --install -s /bin 2>/dev/null
+export PATH=/bin:/sbin:/usr/bin:/usr/sbin
+
+mount -t proc none /proc 2>/dev/null
+mount -t sysfs none /sys 2>/dev/null
+mount -t devtmpfs none /dev 2>/dev/null || {
+	mknod /dev/console c 5 1 2>/dev/null
+	mknod /dev/null c 1 3 2>/dev/null
+	mknod /dev/zero c 1 5 2>/dev/null
+	mknod /dev/kmsg c 1 11 2>/dev/null
+	mknod /dev/tty c 5 0 2>/dev/null
+	busybox mdev -s 2>/dev/null
+}
+mkdir -p /dev/pts /tmp /run /sys/kernel/config /mnt/sd
+mount -t devpts devpts /dev/pts -o newinstance,ptmxmode=0666,mode=620 2>/dev/null || mount -t devpts devpts /dev/pts 2>/dev/null
+ln -sf /dev/pts/ptmx /dev/ptmx 2>/dev/null
+mount -t tmpfs none /tmp 2>/dev/null
+mount -t configfs none /sys/kernel/config 2>/dev/null
+
+SD=0
+for i in $(seq 1 20); do
+	mount -t ext4 -o rw /dev/mmcblk1p1 /mnt/sd 2>/dev/null && { SD=1; break; }
+	sleep 1
+done
+SDLOG=""
+[ "$SD" = 1 ] && { SDLOG=/mnt/sd/cpad-linux.log; : > "$SDLOG" 2>/dev/null; }
+log() {
+	echo "[cpad] $*" > /dev/kmsg 2>/dev/null
+	echo "[cpad] $*"
+	[ -n "$SDLOG" ] && echo "$(cut -d' ' -f1 /proc/uptime) [cpad] $*" >> "$SDLOG" 2>/dev/null
+}
+log "INIT v9 running; kernel=$(uname -r); sd=$SD"
+
+[ -e /dev/watchdog ] && ( while : ; do printf '\0' >/dev/watchdog 2>/dev/null; sleep 5; done ) &
+
+# ---- USB gadget: ACM + RNDIS ----
+G=/sys/kernel/config/usb_gadget/g1
+if mkdir -p "$G" 2>/dev/null; then
+	cd "$G" || true
+	echo 0x1d6b > idVendor 2>/dev/null; echo 0x0104 > idProduct 2>/dev/null
+	mkdir -p strings/0x409 configs/c.1/strings/0x409 functions/acm.usb0 functions/rndis.usb0
+	echo "REDACTED" > strings/0x409/serialnumber 2>/dev/null
+	echo "cpad-linux"   > strings/0x409/manufacturer 2>/dev/null
+	echo "CpadLinux"    > strings/0x409/product 2>/dev/null
+	echo "acm+rndis" > configs/c.1/strings/0x409/configuration 2>/dev/null
+	ln -sf functions/acm.usb0 configs/c.1/ 2>/dev/null
+	ln -sf functions/rndis.usb0 configs/c.1/ 2>/dev/null
+	ls /sys/class/udc 2>/dev/null | head -n1 > UDC 2>/dev/null
+	sleep 1
+	echo 11201000.usb > UDC 2>/dev/null
+	log "UDC=$(cat UDC 2>/dev/null) state=$(cat /sys/class/udc/11201000.usb/state 2>/dev/null)"
+	for n in rndis0 usb0; do
+		[ -d "/sys/class/net/$n" ] || continue
+		ip link set "$n" up 2>/dev/null
+		ip addr add 10.0.0.2/24 dev "$n" 2>/dev/null
+		ip route add default via 10.0.0.1 dev "$n" 2>/dev/null
+		log "net $n up 10.0.0.2/24"
+	done
+fi
+cd /
+
+# ---- persistent rootfs on SD ----
+ROOT=/mnt/sd/linux-root
+if [ "$SD" = 1 ]; then
+	if [ ! -f "$ROOT/etc/alpine-release" ]; then
+		log "first boot: extracting Alpine to SD"
+		mkdir -p "$ROOT"
+		tar xzf /alpine.tar.gz -C "$ROOT" 2>>"$SDLOG"
+	fi
+	mkdir -p "$ROOT/proc" "$ROOT/sys" "$ROOT/dev/pts" "$ROOT/run" "$ROOT/tmp" "$ROOT/etc" "$ROOT/root"
+	mount --bind /proc "$ROOT/proc" 2>/dev/null
+	mount --bind /sys  "$ROOT/sys"  2>/dev/null
+	mount --bind /dev  "$ROOT/dev"  2>/dev/null
+	mount --bind /run  "$ROOT/run"  2>/dev/null
+	mount -t tmpfs -o mode=1777 tmpfs "$ROOT/tmp" 2>/dev/null
+	mount -t devpts devpts "$ROOT/dev/pts" -o newinstance,ptmxmode=0666,mode=620 2>/dev/null || mount -t devpts devpts "$ROOT/dev/pts" 2>/dev/null
+	ln -sf /dev/pts/ptmx "$ROOT/dev/ptmx" 2>/dev/null
+	log "rootfs ready ($(cat "$ROOT/etc/alpine-release" 2>/dev/null))"
+fi
+
+busybox mdev -s 2>/dev/null
+for i in $(seq 1 8); do [ -c /dev/ttyGS0 ] && break; sleep 1; done
+
+# ---- in-rootfs startup: udev + ssh + X desktop ----
+if [ -x "$ROOT/usr/local/bin/cpad-boot" ]; then
+	chroot "$ROOT" /usr/local/bin/cpad-boot >>"$SDLOG" 2>&1
+	log "cpad-boot invoked"
+fi
+
+start_shell() {   # $1 tty
+	[ -c "$1" ] || return 0
+	if [ -f "$ROOT/etc/alpine-release" ]; then
+		setsid chroot "$ROOT" /bin/sh -c "cd /; exec /bin/sh <$1 >$1 2>&1" &
+	else
+		setsid sh -c "cd /; exec sh <$1 >$1 2>&1" &
+	fi
+}
+if [ -c /dev/ttyGS0 ]; then log "shells: ttyGS0"; else log "ttyGS0 missing"; fi
+start_shell /dev/ttyGS0
+start_shell /dev/tty1
+start_shell /dev/console
+log "steady state"
+
+while : ; do sleep 3600; done

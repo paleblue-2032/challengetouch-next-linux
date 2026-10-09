@@ -1,0 +1,1 @@
+bootopt=64S3,32N2,64N2 androidboot.selinux=permissive androidboot.vbmeta.avb_version=1.1 androidboot.vbmeta.device_state=unlocked androidboot.vbmeta.invalidate_on_error=no androidboot.veritymode=ignore_corruption androidboot.dtbo_idx=0 buildvariant=eng
