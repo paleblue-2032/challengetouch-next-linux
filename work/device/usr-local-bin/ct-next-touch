@@ -4,12 +4,12 @@
 # (1920x1200), so a 90-degree transform is needed. Find the direction that
 # makes taps land where you touch.
 #
-#   cpad-touch ccw    # 90 deg counter-clockwise (current default)
-#   cpad-touch cw     # 90 deg clockwise
-#   cpad-touch 180    # upside down
-#   cpad-touch none   # no rotation
-#   cpad-touch horiz  # mirrored horizontally (of none)
-#   cpad-touch vert   # mirrored vertically (of none)
+#   ct-next-touch ccw    # 90 deg counter-clockwise (current default)
+#   ct-next-touch cw     # 90 deg clockwise
+#   ct-next-touch 180    # upside down
+#   ct-next-touch none   # no rotation
+#   ct-next-touch horiz  # mirrored horizontally (of none)
+#   ct-next-touch vert   # mirrored vertically (of none)
 #
 # To make it permanent, put the printed matrix into
 # /etc/X11/xorg.conf.d/20-touch.conf (Option "TransformationMatrix").
@@ -21,7 +21,7 @@ case "$1" in
 	180)  M="-1 0 1 0 -1 1 0 0 1" ;;
 	horiz) M="-1 0 1 0 1 0 0 0 1" ;;
 	vert) M="1 0 0 0 -1 1 0 0 1" ;;
-	*) echo "usage: cpad-touch none|cw|ccw|180|horiz|vert" >&2; exit 1 ;;
+	*) echo "usage: ct-next-touch none|cw|ccw|180|horiz|vert" >&2; exit 1 ;;
 esac
 for name in NVTCapacitiveTouchScreen NVTCapacitivePen; do
 	if xinput set-prop "$name" "Coordinate Transformation Matrix" $M 2>/dev/null; then

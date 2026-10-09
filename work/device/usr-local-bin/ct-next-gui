@@ -4,8 +4,8 @@
 # (pgrep does not reliably see "Xorg" on this kernel).
 export PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 export DISPLAY=:0
-LOG=/var/log/cpad-gui.log
-PIDFILE=/run/cpad-gui.pid
+LOG=/var/log/ct-next-gui.log
+PIDFILE=/run/ct-next-gui.pid
 log() { echo "$(date '+%H:%M:%S') $*" >>"$LOG"; }
 mkdir -p /tmp/.X11-unix /var/log /run /run/user/1000
 chown alpine:alpine /run/user/1000 2>/dev/null
@@ -48,7 +48,7 @@ start_x() {
 
 start_session() {
 	# GNOME must not run as root; run as alpine via su.
-	setsid su alpine -c /usr/local/bin/cpad-session >>"$LOG" 2>&1 &
+	setsid su alpine -c /usr/local/bin/ct-next-session >>"$LOG" 2>&1 &
 	SPID=$!
 	# Set the root background once the session is up (it resets it otherwise).
 	( sleep 10; set_wallpaper; sleep 15; set_wallpaper ) &

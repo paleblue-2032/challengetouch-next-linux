@@ -2,7 +2,7 @@
 # Build a Linux boot image based on the *working* TWRP image:
 #   TWRP kernel + appended DTB + TWRP cmdline (androidboot.selinux=permissive,
 #   veritymode=ignore_corruption, ...)  with our own Linux initramfs.
-# This avoids whatever made the "REDACTED-kernel + our ramdisk" image reset.
+# This avoids whatever made the "stock-kernel + our ramdisk" image reset.
 set -euo pipefail
 BASE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; W="$BASE/work"; R="$W/initramfs-root"
 

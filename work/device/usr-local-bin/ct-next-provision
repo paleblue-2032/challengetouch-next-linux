@@ -25,4 +25,4 @@ apk add \
 # Optional diagnostics used while developing (uncomment if wanted):
 # apk add evtest scrot x11vnc xdotool xdpyinfo icewm
 
-echo "== done. Reboot (or run /usr/local/bin/cpad-boot) to start the desktop =="
+echo "== done. Reboot (or run /usr/local/bin/ct-next-boot) to start the desktop =="

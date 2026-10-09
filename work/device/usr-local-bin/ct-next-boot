@@ -3,7 +3,7 @@
 # Brings up udev, the RNDIS network, SSH and the GNOME desktop.
 # Edit this file on the SD card; no reflash needed.
 export PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
-LOG=/var/log/cpad-boot.log
+LOG=/var/log/ct-next-boot.log
 log() { echo "$(date '+%H:%M:%S') $*" >>"$LOG"; }
 mkdir -p /var/log /tmp/.X11-unix
 
@@ -78,14 +78,14 @@ chown alpine:alpine /run/user/1000 2>/dev/null
 chmod 700 /run/user/1000
 
 # Session definition (GNOME Flashback: gnome-panel + metacity, no GL/Shell).
-if [ ! -f /usr/share/gnome-session/sessions/cpad.session ]; then
+if [ ! -f /usr/share/gnome-session/sessions/ct-next.session ]; then
 	mkdir -p /usr/share/gnome-session/sessions
-	cat > /usr/share/gnome-session/sessions/cpad.session <<'SESS'
+	cat > /usr/share/gnome-session/sessions/ct-next.session <<'SESS'
 [GNOME Session]
 Name=Cpad GNOME Flashback
 RequiredComponents=gnome-panel;metacity;org.gnome.SettingsDaemon.A11ySettings;org.gnome.SettingsDaemon.Color;org.gnome.SettingsDaemon.Datetime;org.gnome.SettingsDaemon.Housekeeping;org.gnome.SettingsDaemon.Keyboard;org.gnome.SettingsDaemon.MediaKeys;org.gnome.SettingsDaemon.Power;org.gnome.SettingsDaemon.PrintNotifications;org.gnome.SettingsDaemon.Rfkill;org.gnome.SettingsDaemon.ScreensaverProxy;org.gnome.SettingsDaemon.Sharing;org.gnome.SettingsDaemon.Smartcard;org.gnome.SettingsDaemon.Sound;org.gnome.SettingsDaemon.UsbProtection;org.gnome.SettingsDaemon.XSettings;
 SESS
-	log "cpad.session created"
+	log "ct-next.session created"
 fi
 
 # Application-menu launchers (handy on a tablet with no keyboard).
@@ -101,7 +101,7 @@ Exec=xterm -fa "Noto Sans Mono CJK JP" -fs 11 -geometry 132x30 -bg "#0b0b0b" -fg
 Icon=utilities-terminal
 Categories=System;
 DESK
-cat > /usr/share/applications/cpad-terminal.desktop <<'DESK'
+cat > /usr/share/applications/ct-next-terminal.desktop <<'DESK'
 [Desktop Entry]
 Type=Application
 Name=Terminal
@@ -113,7 +113,7 @@ DESK
 
 # Power menu launchers. GNOME's own power actions go through systemd (absent
 # here), so provide explicit ones that use elogind (loginctl).
-cat > /usr/share/applications/cpad-shutdown.desktop <<'DESK'
+cat > /usr/share/applications/ct-next-shutdown.desktop <<'DESK'
 [Desktop Entry]
 Type=Application
 Name=Shutdown
@@ -122,7 +122,7 @@ Exec=loginctl poweroff
 Icon=system-shutdown
 Categories=System;
 DESK
-cat > /usr/share/applications/cpad-reboot.desktop <<'DESK'
+cat > /usr/share/applications/ct-next-reboot.desktop <<'DESK'
 [Desktop Entry]
 Type=Application
 Name=Reboot
@@ -145,7 +145,7 @@ X-GNOME-Autostart-enabled=true
 DESK
 
 # Terminal colours: a dark (black background) palette for every xterm, applied
-# through the X resource DB (loaded by cpad-session via xrdb).
+# through the X resource DB (loaded by ct-next-session via xrdb).
 if [ ! -f /home/alpine/.Xresources ]; then
 	cat > /home/alpine/.Xresources <<'XR'
 ! dark xterm
@@ -188,11 +188,11 @@ if ! pgrep -x elogind >/dev/null 2>&1; then
 	setsid /usr/libexec/elogind/elogind >/dev/null 2>&1 &
 	log "elogind started"
 fi
-# There is no logind session, so polkit cannot see "cpad" as active and the
-# GNOME Users panel stays locked. Allow cpad to manage accounts without auth.
+# There is no logind session, so polkit cannot see "ct-next" as active and the
+# GNOME Users panel stays locked. Allow ct-next to manage accounts without auth.
 # (written before polkitd starts so it is loaded.)
 mkdir -p /etc/polkit-1/rules.d
-cat > /etc/polkit-1/rules.d/49-cpad-accounts.rules <<'RULES'
+cat > /etc/polkit-1/rules.d/49-ct-next-accounts.rules <<'RULES'
 polkit.addRule(function(action, subject) {
     if ((action.id.indexOf("org.freedesktop.accounts.") === 0 ||
          action.id.indexOf("org.gnome.controlcenter.user-accounts.") === 0) &&
@@ -212,6 +212,6 @@ if ! pgrep -x accounts-daemon >/dev/null 2>&1; then
 fi
 
 # ---- desktop supervisor (Xorg + GNOME session) -----------------------------
-setsid /usr/local/bin/cpad-gui >>"$LOG" 2>&1 &
-log "cpad-gui launched"
-log "cpad-boot done"
+setsid /usr/local/bin/ct-next-gui >>"$LOG" 2>&1 &
+log "ct-next-gui launched"
+log "ct-next-boot done"

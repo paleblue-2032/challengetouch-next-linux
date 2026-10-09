@@ -1,7 +1,7 @@
 #!/bin/busybox sh
 # Linux init v9: persistent Alpine rootfs on the microSD (ext4), entered via chroot.
 # Adds over v8: a proper /dev/pts inside the chroot (so X terminals work) and a
-# call into /usr/local/bin/cpad-boot (udev + ssh + X desktop), which lives on the
+# call into /usr/local/bin/ct-next-boot (udev + ssh + X desktop), which lives on the
 # SD card and can be edited without reflashing.
 /bin/busybox --install -s /bin 2>/dev/null
 export PATH=/bin:/sbin:/usr/bin:/usr/sbin
@@ -28,11 +28,11 @@ for i in $(seq 1 20); do
 	sleep 1
 done
 SDLOG=""
-[ "$SD" = 1 ] && { SDLOG=/mnt/sd/cpad-linux.log; : > "$SDLOG" 2>/dev/null; }
+[ "$SD" = 1 ] && { SDLOG=/mnt/sd/ct-next-linux.log; : > "$SDLOG" 2>/dev/null; }
 log() {
-	echo "[cpad] $*" > /dev/kmsg 2>/dev/null
-	echo "[cpad] $*"
-	[ -n "$SDLOG" ] && echo "$(cut -d' ' -f1 /proc/uptime) [cpad] $*" >> "$SDLOG" 2>/dev/null
+	echo "[ct-next] $*" > /dev/kmsg 2>/dev/null
+	echo "[ct-next] $*"
+	[ -n "$SDLOG" ] && echo "$(cut -d' ' -f1 /proc/uptime) [ct-next] $*" >> "$SDLOG" 2>/dev/null
 }
 log "INIT v9 running; kernel=$(uname -r); sd=$SD"
 
@@ -44,9 +44,9 @@ if mkdir -p "$G" 2>/dev/null; then
 	cd "$G" || true
 	echo 0x1d6b > idVendor 2>/dev/null; echo 0x0104 > idProduct 2>/dev/null
 	mkdir -p strings/0x409 configs/c.1/strings/0x409 functions/acm.usb0 functions/rndis.usb0
-	echo "REDACTED" > strings/0x409/serialnumber 2>/dev/null
-	echo "cpad-linux"   > strings/0x409/manufacturer 2>/dev/null
-	echo "CpadLinux"    > strings/0x409/product 2>/dev/null
+	echo "ct-next" > strings/0x409/serialnumber 2>/dev/null
+	echo "ct-next-linux"   > strings/0x409/manufacturer 2>/dev/null
+	echo "ChallengeTouchNext" > strings/0x409/product 2>/dev/null
 	echo "acm+rndis" > configs/c.1/strings/0x409/configuration 2>/dev/null
 	ln -sf functions/acm.usb0 configs/c.1/ 2>/dev/null
 	ln -sf functions/rndis.usb0 configs/c.1/ 2>/dev/null
@@ -87,9 +87,9 @@ busybox mdev -s 2>/dev/null
 for i in $(seq 1 8); do [ -c /dev/ttyGS0 ] && break; sleep 1; done
 
 # ---- in-rootfs startup: udev + ssh + X desktop ----
-if [ -x "$ROOT/usr/local/bin/cpad-boot" ]; then
-	chroot "$ROOT" /usr/local/bin/cpad-boot >>"$SDLOG" 2>&1
-	log "cpad-boot invoked"
+if [ -x "$ROOT/usr/local/bin/ct-next-boot" ]; then
+	chroot "$ROOT" /usr/local/bin/ct-next-boot >>"$SDLOG" 2>&1
+	log "ct-next-boot invoked"
 fi
 
 start_shell() {   # $1 tty

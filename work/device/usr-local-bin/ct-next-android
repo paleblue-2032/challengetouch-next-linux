@@ -3,10 +3,10 @@
 # Clears the BCB command in the `para` partition (mmcblk0p16) so LK boots the
 # stock Android kernel on boot/p14 instead of our Linux in the recovery slot.
 # Our Linux re-arms "boot-recovery" on every boot, so clear it here and reboot
-# immediately (Android then boots, leaving our cpad-boot out of the loop).
+# immediately (Android then boots, leaving our ct-next-boot out of the loop).
 PARA=/dev/mmcblk0p16
 if [ ! -b "$PARA" ]; then
-	echo "cpad-android: $PARA not found" >&2
+	echo "ct-next-android: $PARA not found" >&2
 	exit 1
 fi
 dd if=/dev/zero of="$PARA" bs=1 count=32 conv=notrunc 2>/dev/null || exit 1

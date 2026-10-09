@@ -3,8 +3,8 @@
 for p in $(ls /proc 2>/dev/null | grep -E '^[0-9]+$'); do
 	c=$(tr '\0' ' ' </proc/"$p"/cmdline 2>/dev/null)
 	case "$c" in
-		*/usr/local/bin/cpad-gui*) kill "$p" 2>/dev/null ;;
-		*/usr/local/bin/cpad-session*) kill "$p" 2>/dev/null ;;
+		*/usr/local/bin/ct-next-gui*) kill "$p" 2>/dev/null ;;
+		*/usr/local/bin/ct-next-session*) kill "$p" 2>/dev/null ;;
 		*/Xorg*) kill "$p" 2>/dev/null ;;
 	esac
 done
@@ -12,4 +12,4 @@ sleep 2
 pkill -u alpine 2>/dev/null
 rm -f /tmp/.X0-lock
 rm -rf /tmp/.X11-unix
-echo "cpad desktop stopped"
+echo "ct-next desktop stopped"

@@ -32,6 +32,6 @@ Connect:
 
 Notes:
   - The init has a 600s safety watchdog, after which it reboots to Android.
-  - To restore stock recovery:  fastboot flash recovery REDACTED/Next/files/imgs/recovery.img
+  - To restore stock recovery:  fastboot flash recovery <stock recovery.img>
   - boot partition (Android) is never touched by this script.
 EOF

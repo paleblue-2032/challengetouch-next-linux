@@ -1,6 +1,6 @@
 #!/bin/sh
-# Launched as user "alpine" by cpad-gui. Starts the GNOME Flashback (X11)
-# session on the X server that cpad-gui already brought up on :0.
+# Launched as user "alpine" by ct-next-gui. Starts the GNOME Flashback (X11)
+# session on the X server that ct-next-gui already brought up on :0.
 export DISPLAY=:0
 export XDG_RUNTIME_DIR=/run/user/1000
 export XDG_SESSION_TYPE=x11
@@ -16,4 +16,4 @@ export GSK_RENDERER=cairo
 export LIBGL_ALWAYS_SOFTWARE=1
 # Load X resources (xterm colours etc.) into the server's resource DB.
 [ -f "$HOME/.Xresources" ] && xrdb -merge "$HOME/.Xresources" 2>/dev/null
-exec dbus-run-session -- gnome-session --session=cpad
+exec dbus-run-session -- gnome-session --session=ct-next

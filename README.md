@@ -22,7 +22,7 @@ Android を消さずに **recovery スロットへ自作 Linux を焼いて起�
 
 | 項目 | 内容 |
 | --- | --- |
-| 型番 / codename | TAB-A05-BA1 / `a05ba`（シリアル `REDACTED`） |
+| 型番 / codename | TAB-A05-BA1 / `a05ba` |
 | SoC | MediaTek MT8168A（4x Cortex-A53 @2.001GHz）, GPU Mali-G52 MC1 |
 | PMIC / RAM | MT6357 / 4GB |
 | ストレージ | eMMC 16GB (`mmcblk0`) + microSD (`mmcblk1`) |
@@ -31,13 +31,12 @@ Android を消さずに **recovery スロットへ自作 Linux を焼いて起�
 | 無線 | CONSYS_8168（WiFi/BT, SDIO） |
 | カーネル | Linux 4.14.87+（MTK downstream, 2022-12-08 build） |
 | 元 OS | Android 9 (API28), A-only 単一スロット, ブートローダー unlock 済み |
-| 現在の ROM | REDACTED v2.1.0（Pixel 3a `sargo` を偽装） |
 
 ## 全体の仕組み
 
 1. **Linux は `recovery` パーティション (p15) に入る。** `boot` (p14) は純正 Android のまま無傷。
-   LK の起動先は `para` (p16) の BCB コマンド欄で決まり、`cpad-boot` が毎起動 `boot-recovery` を書き戻すため
-   **電源を入れるだけで Linux が起動する**。Android に戻すには Linux 上で `cpad-android`。
+   LK の起動先は `para` (p16) の BCB コマンド欄で決まり、`ct-next-boot` が毎起動 `boot-recovery` を書き戻すため
+   **電源を入れるだけで Linux が起動する**。Android に戻すには Linux 上で `ct-next-android`。
 2. 起動イメージは「既知の起動可能イメージ（TWRP `a05ba-tate.img`）の **ramdisk だけ差し替え**」で作る。
    `mkbootimg` でゼロから作ったイメージは、この LK が要求する **recovery_dtbo + AVB フッター構造**を
    欠くため受け付けられない（起動直後にリセットする）。詳細は `build_linux_img.sh` のコメント参照。
@@ -46,18 +45,18 @@ Android を消さずに **recovery スロットへ自作 Linux を焼いて起�
    - CPU watchdog への給餌スレッドを回す（MTK の再起動回避）
    - **USB ガジェット**を作成 = `acm`（`/dev/ttyACM0` シリアル）+ `rndis`（ネット `10.0.0.2`）
    - microSD (`/dev/mmcblk1p1`) を ext4 でマウント。初回は `alpine.tar.gz` を `/mnt/sd/linux-root` へ展開
-   - `/mnt/sd/linux-root` に bind mount して **chroot** し `/usr/local/bin/cpad-boot` を実行
-4. rootfs 側 `/usr/local/bin/cpad-boot`（SD 上なので**リフラッシュ不要**で編集可）が:
+   - `/mnt/sd/linux-root` に bind mount して **chroot** し `/usr/local/bin/ct-next-boot` を実行
+4. rootfs 側 `/usr/local/bin/ct-next-boot`（SD 上なので**リフラッシュ不要**で編集可）が:
    - **udev** 起動（X が入力デバイスを列挙するのに必須）
    - RNDIS に `10.0.0.2/24` を設定、`dropbear` SSH (:22) を起動
    - **dbus / elogind / polkit** を起動
-   - **Xorg (fbdev) + GNOME Flashback** を起動。`cpad-gui` がスーパバイザとして常駐し
+   - **Xorg (fbdev) + GNOME Flashback** を起動。`ct-next-gui` がスーパバイザとして常駐し
      X と GNOME セッションが落ちても自動復帰する（このカーネルでは `pgrep -x Xorg` が効かないため PID 管理）
 
 > カーネル制約: KMS/DRM (`CONFIG_DRM_MEDIATEK=n`) と VT (`CONFIG_VT=n`) が無いため
 > **Wayland や GDM は使えません**。fbdev Xorg は DRI3 無しで EGL/GL も不可のため、
 > GL 必須の **GNOME Shell は動きません** → GL 不要の **GNOME Flashback** を DM 無しで手動起動しています。
-> タッチはパネル縦(1200x1920)に対し横(1920x1200)座標で来るため 90°変換を当てています（`cpad-touch` で校正）。
+> タッチはパネル縦(1200x1920)に対し横(1920x1200)座標で来るため 90°変換を当てています（`ct-next-touch` で校正）。
 
 > 注意: `fastboot boot <img>` は**使えない**。この MTK LK はどのイメージでも約 23 秒で
 > リセットする（MTK ブート用ウォッチドッグ）。**必ずフラッシュして通常起動**すること。
@@ -66,9 +65,7 @@ Android を消さずに **recovery スロットへ自作 Linux を焼いて起�
 
 ```
 .
-├── README.md                 … このファイル
-├── AGENTS.md                 … 作業引き継ぎメモ（詳細な落とし穴・経緯）
-├── RECOVER.txt               … Android へ戻す手順
+├── README.md                 … このファイル（これだけで再現・運用が完結）
 ├── boot_recovery.sh          … 端末を Linux(recovery) で起動する
 ├── host_net.sh               … ホスト側 RNDIS 設定 (10.0.0.1/24 + NAT)
 ├── build_linux_img.sh        … 既知イメージの ramdisk 差し替えで起動イメージを作る
@@ -89,8 +86,8 @@ Android を消さずに **recovery スロットへ自作 Linux を焼いて起�
     ├── busybox-aarch64       … initramfs に同梱する静的 busybox
     ├── device/               … ★ SD rootfs に置く設定一式
     │   ├── etc/X11/…         … X 設定（fbdev / タッチ変換行列）
-    │   └── usr-local-bin/    … cpad-boot / cpad-gui / cpad-session / cpad-touch /
-    │                            cpad-android / cpad-reset / cpad-provision
+    │   └── usr-local-bin/    … ct-next-boot / ct-next-gui / ct-next-session / ct-next-touch /
+    │                            ct-next-android / ct-next-reset / ct-next-provision
     ├── remote/               … 実機スクリーンショット
     ├── push_device.sh        … device/ を SD rootfs へ同期（リフラッシュ不要）
     ├── ssh.sh                … 端末へ SSH
@@ -127,17 +124,17 @@ fastboot oem reboot-recovery
 sudo bash host_net.sh
 
 # 5. デスクトップ一式を導入（初回のみ・要インターネット。数百 MB）
-work/ssh.sh /usr/local/bin/cpad-provision
+work/ssh.sh /usr/local/bin/ct-next-provision
 work/ssh.sh 'reboot'           # → GNOME が自動起動
 
 # 6. 以後は電源を入れるだけで Linux(GNOME)。Android へは:
-work/ssh.sh /usr/local/bin/cpad-android
+work/ssh.sh /usr/local/bin/ct-next-android
 ```
 
-> `work/initramfs-root/alpine.tar.gz` には `work/device/`（`cpad-boot` など）を**焼き込み済み**なので、
+> `work/initramfs-root/alpine.tar.gz` には `work/device/`（`ct-next-boot` など）を**焼き込み済み**なので、
 > 初回起動の時点で RNDIS ネット＋SSH が上がります。SSH が不通のときは ACM シリアル
 > （`/dev/ttyACM0`、`work/serial_*.py`）で入れます。パッケージ一覧は
-> `work/device/usr-local-bin/cpad-provision` に集約しています。
+> `work/device/usr-local-bin/ct-next-provision` に集約しています。
 
 ## 使い方（Linux を起動して入る）
 
@@ -171,16 +168,16 @@ rootfs は SD 上にあるため、`work/device/` を直して同期するだけ
 bash work/push_device.sh
 ```
 
-- `/usr/local/bin/cpad-boot` … 起動時の一式（udev / net / ssh / dbus・elogind・polkit / GUI 起動 / BCB 再セット）
-- `/usr/local/bin/cpad-gui` … Xorg + GNOME セッションのスーパバイザ
-- `/usr/local/bin/cpad-session` … GNOME セッション起動（`gnome-session --session=cpad`）
-- `/usr/local/bin/cpad-touch` … タッチ/ペンの回転を切り替えて校正（cw/ccw/180/none）
-- `/usr/local/bin/cpad-android` … Android( boot/p14 )へ戻す（BCB をクリアして再起動）
-- `/usr/local/bin/cpad-provision` … デスクトップ一式を apk で導入（初回セットアップ用）
-- `/usr/local/bin/cpad-reset` … デスクトップ停止（再起動用）
+- `/usr/local/bin/ct-next-boot` … 起動時の一式（udev / net / ssh / dbus・elogind・polkit / GUI 起動 / BCB 再セット）
+- `/usr/local/bin/ct-next-gui` … Xorg + GNOME セッションのスーパバイザ
+- `/usr/local/bin/ct-next-session` … GNOME セッション起動（`gnome-session --session=ct-next`）
+- `/usr/local/bin/ct-next-touch` … タッチ/ペンの回転を切り替えて校正（cw/ccw/180/none）
+- `/usr/local/bin/ct-next-android` … Android( boot/p14 )へ戻す（BCB をクリアして再起動）
+- `/usr/local/bin/ct-next-provision` … デスクトップ一式を apk で導入（初回セットアップ用）
+- `/usr/local/bin/ct-next-reset` … デスクトップ停止（再起動用）
 - `/etc/X11/xorg.conf`, `/etc/X11/xorg.conf.d/{20-touch,60-nvt-pen}.conf`
 
-手動で作り直すとき（端末上で）: `/usr/local/bin/cpad-reset` で停止 → `setsid /usr/local/bin/cpad-gui &`
+手動で作り直すとき（端末上で）: `/usr/local/bin/ct-next-reset` で停止 → `setsid /usr/local/bin/ct-next-gui &`
 
 ## 起動イメージを作り直す（initramfs の `init` を変えたとき）
 
@@ -214,9 +211,9 @@ fastboot oem reboot-recovery
 ## Android に戻す
 
 - `boot` (p14) は純正のまま。電源を切って普通に起動すれば Android が起動します。
-- recovery を純正に戻す: `fastboot flash recovery REDACTED/Next/files/imgs/recovery.img`
-  （純正 recovery イメージは下記「含まれないもの」を参照）
-- 詳細は `RECOVER.txt`。
+- recovery を元に戻すには、各自が用意した純正 recovery イメージを
+  `fastboot flash recovery <純正 recovery.img>` で書き戻してください。
+- Android 側のカスタム ROM は本件とは独立で、本リポジトリでは扱いません。
 
 ## リポジトリに含まれないもの
 
@@ -225,7 +222,6 @@ fastboot oem reboot-recovery
 
 | 除外物 | サイズ目安 | 入手先 |
 | --- | --- | --- |
-| `REDACTED/`, `REDACTED_Next_v2.0.0.zip` | 2.3G / 1.1G | REDACTED ROM: https://REDACTED.org/ , https://github.com/CPadREDACTED/REDACTED |
 | `backup/`（実機パーティション吸い出し） | 165M | 各実機から TWRP で吸い出し（復旧用の控え） |
 | `a05ba-kernel/` | 1.3G | https://github.com/coara-chocomaru/mt8168_a05ba_kernel |
 | `mouseos-a05bd-kernel/`（Neo 用・参照） | 1.2G | https://github.com/mouseos/mt8168_a05bd_kernel |
@@ -234,14 +230,17 @@ fastboot oem reboot-recovery
 
 ## 現状 / 次の一手
 
-- **達成**: 電源投入だけで Linux(GNOME) が起動（`para`=p16 の BCB を `cpad-boot` が毎起動 `boot-recovery` にセット）。
-  Android に戻すときは Linux 上で `cpad-android`。
+- **達成**: 電源投入だけで Linux(GNOME) が起動（`para`=p16 の BCB を `ct-next-boot` が毎起動 `boot-recovery` にセット）。
+  Android に戻すときは Linux 上で `ct-next-android`。
 - **達成**: GNOME Flashback デスクトップ（gnome-panel + metacity）。オンスクリーンキーボード `onboard`、
   タッチ90°変換、バックライト消灯対策、hostname `ct-next`、英語UI＋TZ Asia/Tokyo、
   GNOME 設定の Users/Region 有効化まで確認済み（`work/remote/*.png` ほか）。
-- 未実施: 物理的な電源ボタン OFF→ON、タッチ回転方向の最終確定（`cpad-touch`）、日本語UI（`-lang`）。
-- **横表示は不可**（このカーネルは fbdev のみ。`var.rotate` はサイズを入れ替えるだけで走査は回らない）。
-  詳細は `AGENTS.md`。縦(1200x1920)で運用。
+- 未実施: 物理的な電源ボタン OFF→ON、タッチ回転方向の最終確定（`ct-next-touch`）、日本語UI（`-lang`）。
+- **横表示は不可**: このカーネルは fbdev のみ。`fb0` の `var.rotate` は解像度を入れ替えるだけで走査は回らず、
+  X の fbdev `Rotate` も破綻する（90°回転はディスプレイ HW/MTK disp 側が必要で fbdev からは不可）。縦で運用。
+- **電源OFF**: MTK の `mt_power_off()`（`mtk_rtc_common.c`）は、**充電器(USB/AC)接続中は `arch_reset`＝再起動**する実装。
+  よって充電を挿したままでは GUI でも `poweroff`/`loginctl poweroff` でも消えない → **USB を抜いてから**電源OFF する。
+  （GNOME の電源メニューは systemd 依存で無効。`loginctl` を使う Shutdown/Reboot ランチャーを同梱）
 - `boot` (p14) への転用は不可: boot スロットでは自作 initramfs（ramdisk）が実行されず Android が起動する（検証済み）。
 - 別ディストロ: 永続化は SD 上に tarball 展開する方式。`init` の `tar xzf /alpine.tar.gz` を
   別 distro の tarball に差し替えれば入れ替え可能。
@@ -254,7 +253,6 @@ fastboot oem reboot-recovery
 
 ## 参考リンク
 
-- REDACTED: https://REDACTED.org/
 - Next カーネルソース: https://github.com/coara-chocomaru/mt8168_a05ba_kernel
 - Next 用 TWRP: https://github.com/coara-chocomaru/TAB-A05-BA1-Next-TWRP
 - 仕様 (Wiki): https://wiki3.jp/SmileTabLabo/page/14

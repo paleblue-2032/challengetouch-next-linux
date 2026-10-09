@@ -1,6 +1,6 @@
 { pkgs ? import <nixpkgs> { } }:
 pkgs.buildFHSEnv {
-    name = "cpad-kernel-build";
+    name = "ct-next-kernel-build";
     targetPkgs = pkgs: with pkgs; [
       gcc gcc.cc.lib gnumake
       flex bison gperf bc
@@ -18,7 +18,7 @@ pkgs.buildFHSEnv {
     ];
     multiPkgs = pkgs: with pkgs; [ zlib ncurses5 ];
     profile = ''
-      export CCACHE_DIR="$HOME/.ccache-cpad"
+      export CCACHE_DIR="$HOME/.ccache-ct-next"
       umask 022
     '';
     runScript = "bash";
