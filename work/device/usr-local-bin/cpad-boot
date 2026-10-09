@@ -1,11 +1,37 @@
 #!/bin/sh
 # Runs INSIDE the Alpine chroot (SD rootfs), launched by the initramfs init.
-# Brings up udev, the RNDIS network, SSH and the X desktop.
+# Brings up udev, the RNDIS network, SSH and the GNOME desktop.
 # Edit this file on the SD card; no reflash needed.
 export PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 LOG=/var/log/cpad-boot.log
 log() { echo "$(date '+%H:%M:%S') $*" >>"$LOG"; }
 mkdir -p /var/log /tmp/.X11-unix
+
+# ---- boot mode: keep a plain power-on booting Linux -----------------------
+# Our Linux lives in the recovery slot; LK only boots it when the BCB command
+# in the `para` partition (mmcblk0p16) reads "boot-recovery". Re-arm it every
+# boot so the power button keeps landing here (Android stays on boot/p14).
+PARA=/dev/mmcblk0p16
+if [ -b "$PARA" ]; then
+	cur=$(dd if="$PARA" bs=1 count=13 2>/dev/null)
+	if [ "$cur" != "boot-recovery" ]; then
+		dd if=/dev/zero of=/tmp/.bcb bs=1 count=32 2>/dev/null
+		printf 'boot-recovery' | dd of=/tmp/.bcb bs=1 conv=notrunc 2>/dev/null
+		dd if=/tmp/.bcb of="$PARA" bs=1 conv=notrunc 2>/dev/null && sync
+		log "boot mode: para BCB -> boot-recovery"
+	fi
+fi
+
+# ---- /dev permissions ------------------------------------------------------
+# This kernel has no devtmpfs, so mdev creates the nodes with restrictive
+# permissions; non-root (dbus, GNOME session) must be able to open them.
+for d in null zero full random urandom ptmx tty; do
+	[ -e "/dev/$d" ] && chmod 666 "/dev/$d" 2>/dev/null
+done
+[ -e /dev/fb0 ] && chmod 666 /dev/fb0 2>/dev/null
+
+# ---- backlight: make sure the panel is lit ---------------------------------
+[ -e /sys/class/leds/lcd-backlight/brightness ] && echo 200 > /sys/class/leds/lcd-backlight/brightness 2>/dev/null
 
 # ---- udev: X needs it to enumerate input devices --------------------------
 mkdir -p /run/udev
@@ -26,8 +52,13 @@ done
 printf 'nameserver 192.168.11.1\nnameserver 1.1.1.1\n' >/etc/resolv.conf
 printf 'cpad-linux\n' >/etc/hostname
 printf '127.0.0.1 localhost cpad-linux\n' >/etc/hosts
+hostname cpad-linux 2>/dev/null
+printf 'LANG=en_US.UTF-8\n' >/etc/locale.conf
+# Timezone: Japan (English UI).
+ln -sf /usr/share/zoneinfo/Asia/Tokyo /etc/localtime 2>/dev/null
+printf 'Asia/Tokyo\n' >/etc/timezone
 
-# ---- ssh over the RNDIS link ----------------------------------------------
+# ---- ssh over the RNDIS link (before the GUI, so we can always get in) -----
 mkdir -p /etc/dropbear
 [ -f /etc/dropbear/dropbear_ed25519_host_key ] || dropbearkey -t ed25519 -f /etc/dropbear/dropbear_ed25519_host_key >>"$LOG" 2>&1
 [ -f /etc/dropbear/dropbear_rsa_host_key ] || dropbearkey -t rsa -s 2048 -f /etc/dropbear/dropbear_rsa_host_key >>"$LOG" 2>&1
@@ -35,7 +66,131 @@ if ! pgrep -x dropbear >/dev/null 2>&1; then
 	/usr/sbin/dropbear -p 22 2>>"$LOG" && log "dropbear started"
 fi
 
-# ---- X desktop (cpad-gui self-guards against double start) -----------------
+# ---- GNOME session prerequisites -------------------------------------------
+# The desktop runs as user "cpad" (GNOME refuses to run as root). Create it and
+# its runtime dir on first boot.
+id cpad >/dev/null 2>&1 || { adduser -D -s /bin/bash cpad >>"$LOG" 2>&1 && log "user cpad created"; }
+for g in audio video input netdev; do
+	grep -qE "^$g:.*(^|:)cpad(,|$)" /etc/group 2>/dev/null || adduser cpad "$g" >>"$LOG" 2>&1
+done
+mkdir -p /run/user/1000
+chown cpad:cpad /run/user/1000 2>/dev/null
+chmod 700 /run/user/1000
+
+# Session definition (GNOME Flashback: gnome-panel + metacity, no GL/Shell).
+if [ ! -f /usr/share/gnome-session/sessions/cpad.session ]; then
+	mkdir -p /usr/share/gnome-session/sessions
+	cat > /usr/share/gnome-session/sessions/cpad.session <<'SESS'
+[GNOME Session]
+Name=Cpad GNOME Flashback
+RequiredComponents=gnome-panel;metacity;org.gnome.SettingsDaemon.A11ySettings;org.gnome.SettingsDaemon.Color;org.gnome.SettingsDaemon.Datetime;org.gnome.SettingsDaemon.Housekeeping;org.gnome.SettingsDaemon.Keyboard;org.gnome.SettingsDaemon.MediaKeys;org.gnome.SettingsDaemon.Power;org.gnome.SettingsDaemon.PrintNotifications;org.gnome.SettingsDaemon.Rfkill;org.gnome.SettingsDaemon.ScreensaverProxy;org.gnome.SettingsDaemon.Sharing;org.gnome.SettingsDaemon.Smartcard;org.gnome.SettingsDaemon.Sound;org.gnome.SettingsDaemon.UsbProtection;org.gnome.SettingsDaemon.XSettings;
+SESS
+	log "cpad.session created"
+fi
+
+# Application-menu launchers (handy on a tablet with no keyboard).
+# gnome-settings-daemon overwrites the X resource DB, so the xterm colours are
+# passed on the command line rather than via ~/.Xresources.
+mkdir -p /usr/share/applications
+cat > /usr/share/applications/fastfetch.desktop <<'DESK'
+[Desktop Entry]
+Type=Application
+Name=fastfetch
+Comment=System information
+Exec=xterm -fa "Noto Sans Mono CJK JP" -fs 11 -geometry 132x30 -bg "#0b0b0b" -fg "#e6e6e6" -e sh -c "fastfetch; sleep 900"
+Icon=utilities-terminal
+Categories=System;
+DESK
+cat > /usr/share/applications/cpad-terminal.desktop <<'DESK'
+[Desktop Entry]
+Type=Application
+Name=Terminal
+Comment=Terminal (xterm, dark)
+Exec=xterm -fa "Noto Sans Mono CJK JP" -fs 11 -geometry 104x30 -bg "#0b0b0b" -fg "#e6e6e6"
+Icon=utilities-terminal
+Categories=System;
+DESK
+
+# On-screen keyboard (the tablet has no physical keyboard). Big keys docked at
+# the bottom of the 1200x1920 panel.
+mkdir -p /etc/xdg/autostart
+cat > /etc/xdg/autostart/onboard.desktop <<'DESK'
+[Desktop Entry]
+Type=Application
+Name=Onboard
+Comment=On-screen keyboard
+Exec=onboard -t Nightshade -s 1200x560 -y 1360
+X-GNOME-Autostart-enabled=true
+DESK
+
+# Terminal colours: a dark (black background) palette for every xterm, applied
+# through the X resource DB (loaded by cpad-session via xrdb).
+if [ ! -f /home/cpad/.Xresources ]; then
+	cat > /home/cpad/.Xresources <<'XR'
+! dark xterm
+xterm*background:  #0b0b0b
+xterm*foreground:  #e6e6e6
+xterm*cursorColor: #e6e6e6
+xterm*faceName:    Noto Sans Mono CJK JP
+xterm*faceSize:    13
+xterm*color0:  #1c1c1c
+xterm*color1:  #cc6666
+xterm*color2:  #b5bd68
+xterm*color3:  #f0c674
+xterm*color4:  #81a2be
+xterm*color5:  #b294bb
+xterm*color6:  #8abeb7
+xterm*color7:  #c5c8c6
+xterm*color8:  #666666
+xterm*color9:  #d54e53
+xterm*color10: #b9ca4a
+xterm*color11: #e7c547
+xterm*color12: #7aa6da
+xterm*color13: #c397d8
+xterm*color14: #70c0b1
+xterm*color15: #eaeaea
+XR
+	chown cpad:cpad /home/cpad/.Xresources 2>/dev/null
+	log "Xresources created"
+fi
+
+# System bus (dbus), login manager (elogind), polkit.
+mkdir -p /run/dbus
+chown root:messagebus /run/dbus 2>/dev/null
+dbus-uuidgen --ensure=/etc/machine-id 2>/dev/null
+if ! pgrep -x dbus-daemon >/dev/null 2>&1; then
+	dbus-daemon --system --fork --nopidfile --syslog-only 2>>"$LOG" && log "dbus started"
+fi
+mkdir -p /sys/fs/cgroup
+mount -t tmpfs none /sys/fs/cgroup 2>/dev/null
+if ! pgrep -x elogind >/dev/null 2>&1; then
+	setsid /usr/libexec/elogind/elogind >/dev/null 2>&1 &
+	log "elogind started"
+fi
+# There is no logind session, so polkit cannot see "cpad" as active and the
+# GNOME Users panel stays locked. Allow cpad to manage accounts without auth.
+# (written before polkitd starts so it is loaded.)
+mkdir -p /etc/polkit-1/rules.d
+cat > /etc/polkit-1/rules.d/49-cpad-accounts.rules <<'RULES'
+polkit.addRule(function(action, subject) {
+    if ((action.id.indexOf("org.freedesktop.accounts.") === 0 ||
+         action.id.indexOf("org.gnome.controlcenter.user-accounts.") === 0) &&
+        subject.user === "cpad") {
+        return polkit.Result.YES;
+    }
+});
+RULES
+if ! pgrep -x polkitd >/dev/null 2>&1; then
+	setsid /usr/lib/polkit-1/polkitd --no-debug >/dev/null 2>&1 &
+	log "polkitd started"
+fi
+# accountsservice: backs the GNOME "Users" settings panel.
+if ! pgrep -x accounts-daemon >/dev/null 2>&1; then
+	setsid /usr/libexec/accounts-daemon >/dev/null 2>&1 &
+	log "accounts-daemon started"
+fi
+
+# ---- desktop supervisor (Xorg + GNOME session) -----------------------------
 setsid /usr/local/bin/cpad-gui >>"$LOG" 2>&1 &
 log "cpad-gui launched"
 log "cpad-boot done"

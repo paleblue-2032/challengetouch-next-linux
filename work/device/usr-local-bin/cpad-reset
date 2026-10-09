@@ -1,16 +1,15 @@
 #!/bin/sh
-# Stop the GUI stack and its supervisor. Matches on /proc cmdline because pgrep
-# does not reliably report these processes (esp. Xorg) on this kernel.
+# Stop the desktop supervisor and the GNOME session.
 for p in $(ls /proc 2>/dev/null | grep -E '^[0-9]+$'); do
 	c=$(tr '\0' ' ' </proc/"$p"/cmdline 2>/dev/null)
 	case "$c" in
 		*/usr/local/bin/cpad-gui*) kill "$p" 2>/dev/null ;;
+		*/usr/local/bin/cpad-session*) kill "$p" 2>/dev/null ;;
 		*/Xorg*) kill "$p" 2>/dev/null ;;
-		*icewm*) kill "$p" 2>/dev/null ;;
-		*xterm*) kill "$p" 2>/dev/null ;;
 	esac
 done
 sleep 2
+pkill -u cpad 2>/dev/null
 rm -f /tmp/.X0-lock
 rm -rf /tmp/.X11-unix
-echo "cpad-gui stopped"
+echo "cpad desktop stopped"

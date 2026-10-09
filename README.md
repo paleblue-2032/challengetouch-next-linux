@@ -2,10 +2,11 @@
 
 Benesse「チャレンジタッチ NEXT」こと **TAB-A05-BA1**（codename `a05ba`, MediaTek MT8168A）で、
 Android を消さずに **recovery スロットへ自作 Linux を焼いて起動**し、
-**microSD 上の永続 Alpine rootfs + X デスクトップ**を自動起動させるまでの作業メモと一式です。
+**microSD 上の永続 Alpine rootfs + GNOME デスクトップ**を自動起動させるまでの作業メモと一式です。
 
 開発端末から USB 経由（ACM シリアル / RNDIS ネットワーク / SSH）で操作でき、
-画面には icewm + xterm のデスクトップが出ます。日本語表示・タッチ・ペン入力にも対応しています。
+**電源を入れると GNOME（Flashback: gnome-panel + metacity）のデスクトップ**が出ます。
+日本語表示・タッチ・ペン入力にも対応しています。
 
 ```
  +--------------------+        USB (RNDIS)         +----------------------+
@@ -25,7 +26,7 @@ Android を消さずに **recovery スロットへ自作 Linux を焼いて起�
 | SoC | MediaTek MT8168A（4x Cortex-A53 @2.001GHz）, GPU Mali-G52 MC1 |
 | PMIC / RAM | MT6357 / 4GB |
 | ストレージ | eMMC 16GB (`mmcblk0`) + microSD (`mmcblk1`) |
-| 画面 | 1920x1200 DSI（`auo_wuxga_incell_dsi` / `kd_wuxga_incell_dsi`） |
+| 画面 | 1200x1920 DSI 縦パネル（`auo_wuxga_incell_dsi` / `kd_wuxga_incell_dsi`）。UI は縦で運用 |
 | タッチ / ペン | Novatek `nt36xxx`（`novatek,NVT-ts`） |
 | 無線 | CONSYS_8168（WiFi/BT, SDIO） |
 | カーネル | Linux 4.14.87+（MTK downstream, 2022-12-08 build） |
@@ -35,7 +36,8 @@ Android を消さずに **recovery スロットへ自作 Linux を焼いて起�
 ## 全体の仕組み
 
 1. **Linux は `recovery` パーティション (p15) に入る。** `boot` (p14) は純正 Android のまま無傷。
-   普通に電源を入れると Android が起動し、`recovery` 起動を指定したときだけ Linux が起動する。
+   LK の起動先は `para` (p16) の BCB コマンド欄で決まり、`cpad-boot` が毎起動 `boot-recovery` を書き戻すため
+   **電源を入れるだけで Linux が起動する**。Android に戻すには Linux 上で `cpad-android`。
 2. 起動イメージは「既知の起動可能イメージ（TWRP `a05ba-tate.img`）の **ramdisk だけ差し替え**」で作る。
    `mkbootimg` でゼロから作ったイメージは、この LK が要求する **recovery_dtbo + AVB フッター構造**を
    欠くため受け付けられない（起動直後にリセットする）。詳細は `build_linux_img.sh` のコメント参照。
@@ -48,8 +50,14 @@ Android を消さずに **recovery スロットへ自作 Linux を焼いて起�
 4. rootfs 側 `/usr/local/bin/cpad-boot`（SD 上なので**リフラッシュ不要**で編集可）が:
    - **udev** 起動（X が入力デバイスを列挙するのに必須）
    - RNDIS に `10.0.0.2/24` を設定、`dropbear` SSH (:22) を起動
-   - **Xorg (fbdev) + icewm + xterm** を起動。`cpad-gui` がスーパバイザとして常駐し
-     X が落ちても自動復帰する（このカーネルでは `pgrep -x Xorg` が効かないため PID 管理）
+   - **dbus / elogind / polkit** を起動
+   - **Xorg (fbdev) + GNOME Flashback** を起動。`cpad-gui` がスーパバイザとして常駐し
+     X と GNOME セッションが落ちても自動復帰する（このカーネルでは `pgrep -x Xorg` が効かないため PID 管理）
+
+> カーネル制約: KMS/DRM (`CONFIG_DRM_MEDIATEK=n`) と VT (`CONFIG_VT=n`) が無いため
+> **Wayland や GDM は使えません**。fbdev Xorg は DRI3 無しで EGL/GL も不可のため、
+> GL 必須の **GNOME Shell は動きません** → GL 不要の **GNOME Flashback** を DM 無しで手動起動しています。
+> タッチはパネル縦(1200x1920)に対し横(1920x1200)座標で来るため 90°変換を当てています（`cpad-touch` で校正）。
 
 > 注意: `fastboot boot <img>` は**使えない**。この MTK LK はどのイメージでも約 23 秒で
 > リセットする（MTK ブート用ウォッチドッグ）。**必ずフラッシュして通常起動**すること。
@@ -74,13 +82,17 @@ Android を消さずに **recovery スロットへ自作 Linux を焼いて起�
 ├── nix/                      … ホスト補助（sudo/udev 設定など）
 ├── twrp/                     … ベースにする TWRP イメージ（a05ba-tate.img のみ追跡）
 └── work/
+    ├── make_alpine_base.sh   … ★ Alpine ベース + work/device を alpine.tar.gz にビルド
     ├── initramfs-root/       … ★ initramfs のステージング（init + alpine.tar.gz）
     ├── initramfs_alpine_v9.cpio.gz … ★ ビルド済み initramfs（現行 v9）
     ├── linux_v9.img          … ★ 現行の起動イメージ（recovery へ焼く実体）
     ├── busybox-aarch64       … initramfs に同梱する静的 busybox
-    ├── device/               … ★ SD rootfs に置く設定一式（cpad-boot / cpad-gui / X 設定）
+    ├── device/               … ★ SD rootfs に置く設定一式
+    │   ├── etc/X11/…         … X 設定（fbdev / タッチ変換行列）
+    │   └── usr-local-bin/    … cpad-boot / cpad-gui / cpad-session / cpad-touch /
+    │                            cpad-android / cpad-reset / cpad-provision
     ├── remote/               … 実機スクリーンショット
-    ├── push_device.sh        … device/ を SD rootfs へ同期
+    ├── push_device.sh        … device/ を SD rootfs へ同期（リフラッシュ不要）
     ├── ssh.sh                … 端末へ SSH
     ├── enter_fastboot.sh / mtk-bootseq.py … preloader から fastboot へ
     ├── serial_*.py           … USB シリアル経由の操作（SSH 不通時の保険）
@@ -89,7 +101,47 @@ Android を消さずに **recovery スロットへ自作 Linux を焼いて起�
 
 ★ = 再現の要となるファイル。
 
+## ゼロから再現する（第三者向け）
+
+必要なもの: Linux ホスト（`adb` / `fastboot` / `nix` / `bash`）、端末（ブートローダー unlock 済み・Android 起動可）、
+microSD（ext4 1 パーティション）、同梱の `twrp/a05ba-tate.img`。
+
+```sh
+# 1. SD 上の Alpine ベースを作る（Alpine minirootfs を取得し work/device/ を焼き込む）
+bash work/make_alpine_base.sh                      # ネットから Alpine を取得
+# bash work/make_alpine_base.sh /path/base.tar.gz  # 手元の base を使う場合
+
+# 2. initramfs と起動イメージをビルド
+nix-shell -p cpio gzip --run '
+  cd work/initramfs-root &&
+  cp -f ../busybox-aarch64 bin/busybox && chmod 755 bin/busybox init &&
+  find . -print0 | cpio --null -o -H newc --owner=0:0 2>/dev/null | gzip -9 > ../initramfs_alpine_v9.cpio.gz'
+bash build_linux_img.sh work/initramfs_alpine_v9.cpio.gz twrp/a05ba-tate.img work/linux_v9.img
+
+# 3. recovery スロットへ焼く（boot/Android は消さない）
+adb reboot bootloader
+fastboot flash recovery work/linux_v9.img
+fastboot oem reboot-recovery
+
+# 4. ホスト側ネット設定（端末を起動するたびに 1 回）
+sudo bash host_net.sh
+
+# 5. デスクトップ一式を導入（初回のみ・要インターネット。数百 MB）
+work/ssh.sh /usr/local/bin/cpad-provision
+work/ssh.sh 'reboot'           # → GNOME が自動起動
+
+# 6. 以後は電源を入れるだけで Linux(GNOME)。Android へは:
+work/ssh.sh /usr/local/bin/cpad-android
+```
+
+> `work/initramfs-root/alpine.tar.gz` には `work/device/`（`cpad-boot` など）を**焼き込み済み**なので、
+> 初回起動の時点で RNDIS ネット＋SSH が上がります。SSH が不通のときは ACM シリアル
+> （`/dev/ttyACM0`、`work/serial_*.py`）で入れます。パッケージ一覧は
+> `work/device/usr-local-bin/cpad-provision` に集約しています。
+
 ## 使い方（Linux を起動して入る）
+
+電源を入れるだけで Linux が起動します（`para` の BCB 常設）。ホストから明示的に起動する場合は下記:
 
 ```sh
 # 1. 端末を Linux で起動
@@ -119,10 +171,14 @@ rootfs は SD 上にあるため、`work/device/` を直して同期するだけ
 bash work/push_device.sh
 ```
 
-- `/usr/local/bin/cpad-boot` … 起動時の一式（udev / net / ssh / GUI 起動）
-- `/usr/local/bin/cpad-gui` … X デスクトップのスーパバイザ
+- `/usr/local/bin/cpad-boot` … 起動時の一式（udev / net / ssh / dbus・elogind・polkit / GUI 起動 / BCB 再セット）
+- `/usr/local/bin/cpad-gui` … Xorg + GNOME セッションのスーパバイザ
+- `/usr/local/bin/cpad-session` … GNOME セッション起動（`gnome-session --session=cpad`）
+- `/usr/local/bin/cpad-touch` … タッチ/ペンの回転を切り替えて校正（cw/ccw/180/none）
+- `/usr/local/bin/cpad-android` … Android( boot/p14 )へ戻す（BCB をクリアして再起動）
+- `/usr/local/bin/cpad-provision` … デスクトップ一式を apk で導入（初回セットアップ用）
+- `/usr/local/bin/cpad-reset` … デスクトップ停止（再起動用）
 - `/etc/X11/xorg.conf`, `/etc/X11/xorg.conf.d/{20-touch,60-nvt-pen}.conf`
-- `/root/.icewm/preferences`
 
 手動で作り直すとき（端末上で）: `/usr/local/bin/cpad-reset` で停止 → `setsid /usr/local/bin/cpad-gui &`
 
@@ -178,10 +234,15 @@ fastboot oem reboot-recovery
 
 ## 現状 / 次の一手
 
-- **達成**: 再起動後 3 分以上安定稼働・スクリーンショット確認済み（日本語表示込み, `work/remote/*.png`）。
-- 未実施: タッチ実機テスト（必要なら libinput キャリブレーション）。
-- 候補: 常用アプリ（GPU 無効ゆえソフトウェアレンダリングの重さに注意）。
-- 将来: `boot` (p14) へ焼いて電源だけで起動（**AVB フッター構造必須・要注意**）。
+- **達成**: 電源投入だけで Linux(GNOME) が起動（`para`=p16 の BCB を `cpad-boot` が毎起動 `boot-recovery` にセット）。
+  Android に戻すときは Linux 上で `cpad-android`。
+- **達成**: GNOME Flashback デスクトップ（gnome-panel + metacity）。オンスクリーンキーボード `onboard`、
+  タッチ90°変換、バックライト消灯対策、hostname `cpad-linux`、英語UI＋TZ Asia/Tokyo、
+  GNOME 設定の Users/Region 有効化まで確認済み（`work/remote/*.png` ほか）。
+- 未実施: 物理的な電源ボタン OFF→ON、タッチ回転方向の最終確定（`cpad-touch`）、日本語UI（`-lang`）。
+- **横表示は不可**（このカーネルは fbdev のみ。`var.rotate` はサイズを入れ替えるだけで走査は回らない）。
+  詳細は `AGENTS.md`。縦(1200x1920)で運用。
+- `boot` (p14) への転用は不可: boot スロットでは自作 initramfs（ramdisk）が実行されず Android が起動する（検証済み）。
 - 別ディストロ: 永続化は SD 上に tarball 展開する方式。`init` の `tar xzf /alpine.tar.gz` を
   別 distro の tarball に差し替えれば入れ替え可能。
 

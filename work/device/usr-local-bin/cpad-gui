@@ -1,13 +1,15 @@
 #!/bin/sh
-# Keep a minimal X desktop (Xorg + icewm + xterm) alive on the DSI panel.
-# Uses explicit PIDs (pgrep does not reliably see "Xorg" on this kernel) and a
-# pidfile so only one supervisor ever runs.
+# Keep the desktop (Xorg + GNOME Flashback session as user cpad) alive on the
+# DSI panel. Uses explicit PIDs and a pidfile so only one supervisor runs
+# (pgrep does not reliably see "Xorg" on this kernel).
 export PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 export DISPLAY=:0
 LOG=/var/log/cpad-gui.log
 PIDFILE=/run/cpad-gui.pid
 log() { echo "$(date '+%H:%M:%S') $*" >>"$LOG"; }
-mkdir -p /tmp/.X11-unix /var/log /run
+mkdir -p /tmp/.X11-unix /var/log /run /run/user/1000
+chown cpad:cpad /run/user/1000 2>/dev/null
+chmod 700 /run/user/1000
 
 if [ -f "$PIDFILE" ]; then
 	old=$(cat "$PIDFILE" 2>/dev/null)
@@ -19,9 +21,16 @@ fi
 echo $$ >"$PIDFILE"
 
 XPID=""
-IPID=""
-TPID=""
+SPID=""
 alive() { [ -n "$1" ] && kill -0 "$1" 2>/dev/null; }
+
+# GNOME Flashback has no component that draws the root window (nautilus-desktop
+# is gone), so without this the desktop stays black. The colour is a solid PNG.
+WALL_B64='iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAD0lEQVR42mOwwAEYhpYEAGm4KgEIAvPmAAAAAElFTkSuQmCC'
+set_wallpaper() {
+	printf '%s' "$WALL_B64" | base64 -d > /tmp/.wall.png 2>/dev/null
+	[ -s /tmp/.wall.png ] && feh --bg-fill /tmp/.wall.png >/dev/null 2>&1
+}
 
 start_x() {
 	rm -f /tmp/.X0-lock
@@ -35,26 +44,25 @@ start_x() {
 		i=$((i + 1))
 	done
 	log "Xorg up (pid $XPID) after ${i}s"
-	xsetroot -solid '#0b2436' 2>/dev/null
+}
+
+start_session() {
+	# GNOME must not run as root; run as cpad via su.
+	setsid su cpad -c /usr/local/bin/cpad-session >>"$LOG" 2>&1 &
+	SPID=$!
+	# Set the root background once the session is up (it resets it otherwise).
+	( sleep 10; set_wallpaper; sleep 15; set_wallpaper ) &
+	log "GNOME session started (pid $SPID)"
 }
 
 while :; do
-	alive "$XPID" || start_x
-
-	if ! alive "$IPID"; then
-		icewm-session >>"$LOG" 2>&1 &
-		IPID=$!
-		log "icewm-session started (pid $IPID)"
+	if ! alive "$XPID"; then
+		start_x
+		alive "$SPID" && kill "$SPID" 2>/dev/null
+		SPID=""
 	fi
-
-	sleep 3
-
-	if ! alive "$TPID"; then
-		xterm -geometry 84x46 -fa 'Noto Sans Mono CJK JP' -fs 13 \
-			-bg '#0b0b0b' -fg '#e6e6e6' -title cpad >>"$LOG" 2>&1 &
-		TPID=$!
-		log "xterm started (pid $TPID)"
+	if alive "$XPID" && ! alive "$SPID"; then
+		start_session
 	fi
-
-	sleep 7
+	sleep 5
 done

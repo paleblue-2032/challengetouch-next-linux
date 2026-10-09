@@ -27,6 +27,7 @@
 !/work/linux_v9.img
 !/work/initramfs_alpine_v9.cpio.gz
 !/work/busybox-aarch64
+!/work/make_alpine_base.sh
 !/work/push_device.sh
 !/work/ssh.sh
 !/work/enter_fastboot.sh

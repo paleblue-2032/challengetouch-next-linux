@@ -1,0 +1,19 @@
+#!/bin/sh
+# Launched as user "cpad" by cpad-gui. Starts the GNOME Flashback (X11)
+# session on the X server that cpad-gui already brought up on :0.
+export DISPLAY=:0
+export XDG_RUNTIME_DIR=/run/user/1000
+export XDG_SESSION_TYPE=x11
+export XDG_CURRENT_DESKTOP=GNOME-Flashback:GNOME
+export XDG_SESSION_DESKTOP=gnome-flashback-metacity
+export XDG_SEAT=seat0
+export XDG_SESSION_CLASS=user
+export LANG=en_US.UTF-8
+export TZ=Asia/Tokyo
+# No GPU/EGL on this kernel (fbdev, no DRI3): force software rendering so
+# GTK4/libadwaita apps (Settings, etc.) don't come up as a blank/black window.
+export GSK_RENDERER=cairo
+export LIBGL_ALWAYS_SOFTWARE=1
+# Load X resources (xterm colours etc.) into the server's resource DB.
+[ -f "$HOME/.Xresources" ] && xrdb -merge "$HOME/.Xresources" 2>/dev/null
+exec dbus-run-session -- gnome-session --session=cpad

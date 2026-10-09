@@ -1,0 +1,28 @@
+#!/bin/sh
+# Install the desktop stack on a freshly-flashed Alpine rootfs.
+#
+# Run once on the device, as root, after first boot and once the RNDIS link has
+# internet (host: sudo bash host_net.sh). Requires network for apk.
+# The list equals the reference device's /etc/apk/world.
+set -e
+export PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+echo "== apk update =="
+apk update
+
+echo "== installing base + desktop stack =="
+apk add \
+	alpine-baselayout alpine-keys alpine-release apk-tools busybox musl-utils \
+	dropbear eudev \
+	xorg-server xinit xf86-video-fbdev xf86-input-libinput xf86-input-evdev \
+	xinput xsetroot \
+	fontconfig font-noto-cjk font-noto-cjk-extra font-cursor-misc font-misc-misc ttf-dejavu \
+	gnome gnome-flashback gnome-settings-daemon metacity \
+	accountsservice onboard \
+	fastfetch feh xterm \
+	musl-locales tzdata
+
+# Optional diagnostics used while developing (uncomment if wanted):
+# apk add evtest scrot x11vnc xdotool xdpyinfo icewm
+
+echo "== done. Reboot (or run /usr/local/bin/cpad-boot) to start the desktop =="
