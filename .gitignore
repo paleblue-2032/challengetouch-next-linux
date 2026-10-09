@@ -5,9 +5,7 @@
 # ===========================================================================
 
 # Stock firmware / ROM images (proprietary, hundreds of MB each)
-/REDACTED/
 /backup/
-/REDACTED_Next_v2.0.0.zip
 
 # Upstream kernel sources and tools (plain git clones; re-fetch by URL)
 /a05ba-kernel/
@@ -23,7 +21,6 @@
 /work/*
 !/work/device/
 !/work/initramfs-root/
-!/work/remote/
 !/work/linux_v9.img
 !/work/initramfs_alpine_v9.cpio.gz
 !/work/busybox-aarch64

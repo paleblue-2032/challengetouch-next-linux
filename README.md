@@ -76,7 +76,6 @@ Android を消さずに **recovery スロットへ自作 Linux を焼いて起�
 ├── next.dts / dtbo_next.dts  … Next の DTS / DTBO ソース
 ├── next_appended.dtb         … カーネルに付ける DTB
 ├── kernel_Image.gz           … 純正カーネル blob（boot イメージ組み立て用）
-├── nix/                      … ホスト補助（sudo/udev 設定など）
 ├── twrp/                     … ベースにする TWRP イメージ（a05ba-tate.img のみ追跡）
 └── work/
     ├── make_alpine_base.sh   … ★ Alpine ベース + work/device を alpine.tar.gz にビルド
@@ -88,7 +87,6 @@ Android を消さずに **recovery スロットへ自作 Linux を焼いて起�
     │   ├── etc/X11/…         … X 設定（fbdev / タッチ変換行列）
     │   └── usr-local-bin/    … ct-next-boot / ct-next-gui / ct-next-session / ct-next-touch /
     │                            ct-next-android / ct-next-reset / ct-next-provision
-    ├── remote/               … 実機スクリーンショット
     ├── push_device.sh        … device/ を SD rootfs へ同期（リフラッシュ不要）
     ├── ssh.sh                … 端末へ SSH
     ├── enter_fastboot.sh / mtk-bootseq.py … preloader から fastboot へ
@@ -234,7 +232,7 @@ fastboot oem reboot-recovery
   Android に戻すときは Linux 上で `ct-next-android`。
 - **達成**: GNOME Flashback デスクトップ（gnome-panel + metacity）。オンスクリーンキーボード `onboard`、
   タッチ90°変換、バックライト消灯対策、hostname `ct-next`、英語UI＋TZ Asia/Tokyo、
-  GNOME 設定の Users/Region 有効化まで確認済み（`work/remote/*.png` ほか）。
+  GNOME 設定の Users/Region 有効化まで確認済み。
 - 未実施: 物理的な電源ボタン OFF→ON、タッチ回転方向の最終確定（`ct-next-touch`）、日本語UI（`-lang`）。
 - **横表示は不可**: このカーネルは fbdev のみ。`fb0` の `var.rotate` は解像度を入れ替えるだけで走査は回らず、
   X の fbdev `Rotate` も破綻する（90°回転はディスプレイ HW/MTK disp 側が必要で fbdev からは不可）。縦で運用。

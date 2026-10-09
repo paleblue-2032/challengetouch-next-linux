@@ -8,7 +8,7 @@ BASE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SRC="$BASE/work/device"
 SSH="$BASE/work/ssh.sh"
 
-$SSH 'mkdir -p /etc/X11/xorg.conf.d /usr/local/bin /root/.icewm /var/log'
+$SSH 'mkdir -p /etc/X11/xorg.conf.d /usr/local/bin /var/log'
 
 # plain files (path preserved under /)
 (cd "$SRC" && find . -type f -not -path './usr-local-bin/*' -not -path './root/*' -printf '%P\n') |
@@ -24,12 +24,4 @@ for f in "$SRC"/usr-local-bin/*; do
 	echo "  -> /usr/local/bin/$b"
 done
 
-# /root
-(cd "$SRC/root" && find . -type f -printf '%P\n') |
-	while read -r f; do
-		$SSH "mkdir -p /root/$(dirname "$f") && cat > /root/$f" <"$SRC/root/$f"
-		echo "  -> /root/$f"
-	done
-
-$SSH 'chmod 755 /root/.icewm/startup 2>/dev/null; chmod 600 /root/.icewm/preferences 2>/dev/null; true'
 echo "sync done"
