@@ -9,7 +9,7 @@ for p in $(ls /proc 2>/dev/null | grep -E '^[0-9]+$'); do
 	esac
 done
 sleep 2
-pkill -u cpad 2>/dev/null
+pkill -u alpine 2>/dev/null
 rm -f /tmp/.X0-lock
 rm -rf /tmp/.X11-unix
 echo "cpad desktop stopped"

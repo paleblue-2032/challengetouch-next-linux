@@ -1,5 +1,5 @@
 #!/bin/sh
-# Launched as user "cpad" by cpad-gui. Starts the GNOME Flashback (X11)
+# Launched as user "alpine" by cpad-gui. Starts the GNOME Flashback (X11)
 # session on the X server that cpad-gui already brought up on :0.
 export DISPLAY=:0
 export XDG_RUNTIME_DIR=/run/user/1000

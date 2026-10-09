@@ -50,9 +50,9 @@ for n in rndis0 usb0; do
 	log "net $n up"
 done
 printf 'nameserver 192.168.11.1\nnameserver 1.1.1.1\n' >/etc/resolv.conf
-printf 'cpad-linux\n' >/etc/hostname
-printf '127.0.0.1 localhost cpad-linux\n' >/etc/hosts
-hostname cpad-linux 2>/dev/null
+printf 'ct-next\n' >/etc/hostname
+printf '127.0.0.1 localhost ct-next\n' >/etc/hosts
+hostname ct-next 2>/dev/null
 printf 'LANG=en_US.UTF-8\n' >/etc/locale.conf
 # Timezone: Japan (English UI).
 ln -sf /usr/share/zoneinfo/Asia/Tokyo /etc/localtime 2>/dev/null
@@ -67,14 +67,14 @@ if ! pgrep -x dropbear >/dev/null 2>&1; then
 fi
 
 # ---- GNOME session prerequisites -------------------------------------------
-# The desktop runs as user "cpad" (GNOME refuses to run as root). Create it and
+# The desktop runs as user "alpine" (GNOME refuses to run as root). Create it and
 # its runtime dir on first boot.
-id cpad >/dev/null 2>&1 || { adduser -D -s /bin/bash cpad >>"$LOG" 2>&1 && log "user cpad created"; }
+id alpine >/dev/null 2>&1 || { adduser -D -s /bin/bash alpine >>"$LOG" 2>&1 && log "user alpine created"; }
 for g in audio video input netdev; do
-	grep -qE "^$g:.*(^|:)cpad(,|$)" /etc/group 2>/dev/null || adduser cpad "$g" >>"$LOG" 2>&1
+	grep -qE "^$g:.*(^|:)alpine(,|$)" /etc/group 2>/dev/null || adduser alpine "$g" >>"$LOG" 2>&1
 done
 mkdir -p /run/user/1000
-chown cpad:cpad /run/user/1000 2>/dev/null
+chown alpine:alpine /run/user/1000 2>/dev/null
 chmod 700 /run/user/1000
 
 # Session definition (GNOME Flashback: gnome-panel + metacity, no GL/Shell).
@@ -125,8 +125,8 @@ DESK
 
 # Terminal colours: a dark (black background) palette for every xterm, applied
 # through the X resource DB (loaded by cpad-session via xrdb).
-if [ ! -f /home/cpad/.Xresources ]; then
-	cat > /home/cpad/.Xresources <<'XR'
+if [ ! -f /home/alpine/.Xresources ]; then
+	cat > /home/alpine/.Xresources <<'XR'
 ! dark xterm
 xterm*background:  #0b0b0b
 xterm*foreground:  #e6e6e6
@@ -150,7 +150,7 @@ xterm*color13: #c397d8
 xterm*color14: #70c0b1
 xterm*color15: #eaeaea
 XR
-	chown cpad:cpad /home/cpad/.Xresources 2>/dev/null
+	chown alpine:alpine /home/alpine/.Xresources 2>/dev/null
 	log "Xresources created"
 fi
 
@@ -175,7 +175,7 @@ cat > /etc/polkit-1/rules.d/49-cpad-accounts.rules <<'RULES'
 polkit.addRule(function(action, subject) {
     if ((action.id.indexOf("org.freedesktop.accounts.") === 0 ||
          action.id.indexOf("org.gnome.controlcenter.user-accounts.") === 0) &&
-        subject.user === "cpad") {
+        subject.user === "alpine") {
         return polkit.Result.YES;
     }
 });

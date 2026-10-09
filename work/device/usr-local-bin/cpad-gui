@@ -1,5 +1,5 @@
 #!/bin/sh
-# Keep the desktop (Xorg + GNOME Flashback session as user cpad) alive on the
+# Keep the desktop (Xorg + GNOME Flashback session as user alpine) alive on the
 # DSI panel. Uses explicit PIDs and a pidfile so only one supervisor runs
 # (pgrep does not reliably see "Xorg" on this kernel).
 export PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
@@ -8,7 +8,7 @@ LOG=/var/log/cpad-gui.log
 PIDFILE=/run/cpad-gui.pid
 log() { echo "$(date '+%H:%M:%S') $*" >>"$LOG"; }
 mkdir -p /tmp/.X11-unix /var/log /run /run/user/1000
-chown cpad:cpad /run/user/1000 2>/dev/null
+chown alpine:alpine /run/user/1000 2>/dev/null
 chmod 700 /run/user/1000
 
 if [ -f "$PIDFILE" ]; then
@@ -47,8 +47,8 @@ start_x() {
 }
 
 start_session() {
-	# GNOME must not run as root; run as cpad via su.
-	setsid su cpad -c /usr/local/bin/cpad-session >>"$LOG" 2>&1 &
+	# GNOME must not run as root; run as alpine via su.
+	setsid su alpine -c /usr/local/bin/cpad-session >>"$LOG" 2>&1 &
 	SPID=$!
 	# Set the root background once the session is up (it resets it otherwise).
 	( sleep 10; set_wallpaper; sleep 15; set_wallpaper ) &

@@ -237,7 +237,7 @@ fastboot oem reboot-recovery
 - **達成**: 電源投入だけで Linux(GNOME) が起動（`para`=p16 の BCB を `cpad-boot` が毎起動 `boot-recovery` にセット）。
   Android に戻すときは Linux 上で `cpad-android`。
 - **達成**: GNOME Flashback デスクトップ（gnome-panel + metacity）。オンスクリーンキーボード `onboard`、
-  タッチ90°変換、バックライト消灯対策、hostname `cpad-linux`、英語UI＋TZ Asia/Tokyo、
+  タッチ90°変換、バックライト消灯対策、hostname `ct-next`、英語UI＋TZ Asia/Tokyo、
   GNOME 設定の Users/Region 有効化まで確認済み（`work/remote/*.png` ほか）。
 - 未実施: 物理的な電源ボタン OFF→ON、タッチ回転方向の最終確定（`cpad-touch`）、日本語UI（`-lang`）。
 - **横表示は不可**（このカーネルは fbdev のみ。`var.rotate` はサイズを入れ替えるだけで走査は回らない）。
