@@ -270,6 +270,10 @@ fastboot oem reboot-recovery
 - **達成**: GNOME Flashback デスクトップ（gnome-panel + metacity）。オンスクリーンキーボード `onboard`、
   タッチ90°変換、バックライト消灯対策、hostname `ct-next`、英語UI＋TZ Asia/Tokyo、
   GNOME 設定の Users/Region 有効化まで確認済み。
+- **達成**: PC(USB) を外してもタッチが動作。充電器/USB の抜き差しで `charger_thread` が Novatek の
+  charger-mode コマンドを送っており、抜いた時に送られる `0x51`(plug-out) がこのパネルのタッチ報告を
+  止めてしまうため、`set_charger_mode()` を常に plug-in 状態(0x53) を維持するよう修正
+  （`kernel/ct-next-kernel.patch`）。
 - 未実施: 物理的な電源ボタン OFF→ON、タッチ回転方向の最終確定（`ct-next-touch`）、日本語UI（`-lang`）。
 - **横表示は不可**: このカーネルは fbdev のみ。`fb0` の `var.rotate` は解像度を入れ替えるだけで走査は回らず、
   X の fbdev `Rotate` も破綻する（90°回転はディスプレイ HW/MTK disp 側が必要で fbdev からは不可）。縦で運用。

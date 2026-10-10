@@ -270,3 +270,22 @@ index 820f72dce..e4a734019 100644
  		/* enable channel merge */
  		if (dai_id == MT8168_AFE_MEMIF_VUL2 &&
  		    !ctrl_data->bypass_cm1) {
+diff --git a/drivers/input/touchscreen/mediatek/nt36xxx/nt36xxx.c b/drivers/input/touchscreen/mediatek/nt36xxx/nt36xxx.c
+--- a/drivers/input/touchscreen/mediatek/nt36xxx/nt36xxx.c
++++ b/drivers/input/touchscreen/mediatek/nt36xxx/nt36xxx.c
+@@ -780,6 +780,15 @@
+ {
+ 	int ret;
+ 
++	/* Charger-mode switching is broken on this panel: the plug-out
++	 * command (CMD_CHARGER_PLUG_OUT, 0x51) makes the Novatek IC stop
++	 * reporting touches. Verified on the device: no touch interrupts
++	 * while the charger/USB is disconnected, and they resume only after
++	 * CMD_CHARGER_PLUG_IN (0x53) is sent on plug-in. Keep the IC in the
++	 * plug-in state that is known to work, regardless of the charger. */
++	(void)enable;
++	enable = 1;
++
+ 	if (bTouchIsAwake == 0) {
+ 		return;
+ 	}
