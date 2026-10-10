@@ -16,4 +16,24 @@ export GSK_RENDERER=cairo
 export LIBGL_ALWAYS_SOFTWARE=1
 # Load X resources (xterm colours etc.) into the server's resource DB.
 [ -f "$HOME/.Xresources" ] && xrdb -merge "$HOME/.Xresources" 2>/dev/null
-exec dbus-run-session -- gnome-session --session=ct-next
+# The panel must never blank: fbdev has no usable DPMS and the screen does
+# not come back on its own. The settings-daemon power plugin defaults to
+# sleep-inactive-ac-timeout=900, which turned the screen off after 15 idle
+# minutes on the charger (backlight still on, panel black). Disable all of
+# that before gnome-session starts, inside the session bus so dconf writes.
+exec dbus-run-session -- sh -c '
+	apply() {
+		gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-timeout 0 2>/dev/null
+		gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type nothing 2>/dev/null
+		gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-battery-timeout 0 2>/dev/null
+		gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-battery-type nothing 2>/dev/null
+		gsettings set org.gnome.settings-daemon.plugins.power idle-dim false 2>/dev/null
+		gsettings set org.gnome.desktop.session idle-delay 0 2>/dev/null
+		gsettings set org.gnome.desktop.screensaver idle-activation-enabled false 2>/dev/null
+	}
+	apply
+	# Re-apply shortly after the settings daemon has started, in case it
+	# overwrites the values while coming up.
+	( sleep 20; apply; sleep 60; apply ) &
+	exec gnome-session --session=ct-next
+'
