@@ -174,3 +174,72 @@ index 0dc922bb7..b54c4a9a4 100644
  
  HOSTCFLAGS_checks.o := $(HOSTCFLAGS_DTC)
  HOSTCFLAGS_data.o := $(HOSTCFLAGS_DTC)
+diff --git a/sound/soc/mediatek/mt8168/mt8168-adsp-pcm.c b/sound/soc/mediatek/mt8168/mt8168-adsp-pcm.c
+index e82f7950d..60ede5ded 100644
+--- a/sound/soc/mediatek/mt8168/mt8168-adsp-pcm.c
++++ b/sound/soc/mediatek/mt8168/mt8168-adsp-pcm.c
+@@ -2284,59 +2284,13 @@ static int hostless_pcm_format_info(struct snd_kcontrol *kcontrol,
+ 	.put = hostless_pcm_format_put, }
+ 
+ static const struct snd_kcontrol_new mt8168_adsp_controls[] = {
+-	SOC_SINGLE_BOOL_EXT("ADSP Enable",
+-			    0,
+-			    mt8168_adsp_enable_get,
+-			    mt8168_adsp_enable_put),
+-	SOC_SINGLE_BOOL_EXT("VA VAD Enable",
+-			    0,
+-			    mt8168_adsp_va_vad_get,
+-			    mt8168_adsp_va_vad_put),
+-	SOC_SINGLE_BOOL_EXT("VA AEC Enable",
+-			    0,
+-			    mt8168_adsp_va_aec_get,
+-			    mt8168_adsp_va_aec_put),
+-	SOC_SINGLE_BOOL_EXT("VA WakeWord Enable",
+-			    0,
+-			    mt8168_adsp_va_ww_get,
+-			    mt8168_adsp_va_ww_put),
+-	SOC_SINGLE_EXT("VA Beamforming",
+-			    0,
+-			    0,
+-			    0x800000,
+-			    0,
+-			    mt8168_adsp_va_beamforming_get,
+-			    0),
+-	SOC_SINGLE_BOOL_EXT("VA VOICEUPLOAD Done",
+-			    0,
+-			    mt8168_adsp_va_voiceupload_get,
+-			    mt8168_adsp_va_voiceupload_put),
+-	SOC_SINGLE_BOOL_EXT("AP Suspend Test",
+-			    0,
+-			    mt8168_adsp_ap_suspend_get,
+-			    mt8168_adsp_ap_suspend_put),
+-
+-	SOC_SINGLE_BOOL_EXT("VA Force Test",
+-			    0,
+-			    mt8168_adsp_va_force_ok_get,
+-			    mt8168_adsp_va_force_ok_put),
+-	SOC_SINGLE_BOOL_EXT("VA Hostless Enable",
+-			    0,
+-			    mt8168_adsp_hostless_get,
+-			    mt8168_adsp_hostless_put),
+-	SOC_ENUM_EXT("ADSP Clock Mode",
+-			    mt8168_adsp_clk_mode_enums,
+-			    mt8168_adsp_clk_mode_get,
+-			    mt8168_adsp_clk_mode_put),
+-#if 0
+-	SOC_SINGLE_BOOL_EXT("DCXO SW",
+-			    0,
+-			    mt8168_adsp_dcxo_sw_get,
+-			    mt8168_adsp_dcxo_sw_put),
+-#endif
+-	SOC_HOSTLESS_PCM_FORMAT_DECL("Hostless_Pcm_Format Select"),
++	/* ADSP controls intentionally not registered: their get/put go through
++	 * the ADSP IPI, which is not running on this port. A single control that
++	 * fails to read makes the whole card mixer unusable (amixer/alsactl abort
++	 * on it), so nothing can be routed from userspace. */
+ };
+ 
++
+ static const struct snd_soc_component_driver mt8168_adsp_pcm_dai_comp_drv = {
+ 	.name = "mt8168-adsp-pcm-dai",
+ 	.dapm_widgets = mt8168_adsp_pcm_widgets,

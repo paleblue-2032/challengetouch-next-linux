@@ -41,6 +41,16 @@ fi
 /sbin/udevadm trigger --action=add 2>>"$LOG"
 /sbin/udevadm settle 2>>"$LOG"
 
+# ---- audio: restore the mixer state --------------------------------------
+# The speaker sits behind an external amp that is only enabled when the DAPM
+# path DL1 -> I05/I06 -> O03/O04 -> INT ADDA -> MT6357 -> AU_HP -> Spk Amp is
+# powered. Those DAPM switches default to off and nothing turns them on here
+# (no audio HAL), so the speaker stays silent. Restore the saved state.
+if [ -f /etc/asound.state ]; then
+	alsactl -f /etc/asound.state restore 0 >/dev/null 2>&1
+	log "alsa state restored"
+fi
+
 # ---- network: the RNDIS gadget is set up by the initramfs init ------------
 for n in rndis0 usb0; do
 	[ -d "/sys/class/net/$n" ] || continue
