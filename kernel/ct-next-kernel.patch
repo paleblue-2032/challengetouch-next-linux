@@ -50,14 +50,36 @@ index a806a0e59..c37fb5ceb 100644
  ccflags-$(CONFIG_MTK_AEE_IPANIC) += -DTEXT_OFFSET=$(TEXT_OFFSET)
  obj-$(CONFIG_MTK_AEE_IPANIC)	+= mrdump.o
 diff --git a/drivers/misc/mediatek/rtc/mt6358_misc.c b/drivers/misc/mediatek/rtc/mt6358_misc.c
-index 55d720870..3b15eceaf 100644
+index 55d720870..877fecbc6 100644
 --- a/drivers/misc/mediatek/rtc/mt6358_misc.c
 +++ b/drivers/misc/mediatek/rtc/mt6358_misc.c
-@@ -857,21 +857,16 @@ void mt_power_off(void)
+@@ -13,6 +13,7 @@
+  *
+  */
+ #include <linux/module.h>
++#include <linux/io.h>
+ #include <linux/regmap.h>
+ #include <linux/rtc.h>
+ #include <linux/sched/clock.h>
+@@ -857,21 +858,30 @@ void mt_power_off(void)
  	/* pull PWRBB low */
  	PMIC_POWER_HOLD(0);
  
-+	/* Patched for a reliable power-off: never reboot on charger. */
++	/* Patched for a reliable power-off: never reboot on charger. Disable
++	 * the MTK watchdog (toprgu @ 0x10007000) too; it is kicked from
++	 * userspace, which stops here, and would reset the SoC ~25s later. */
++	{
++		void __iomem *wdt = ioremap(0x10007000, 0x1000);
++
++		if (wdt) {
++			u32 mode = readl(wdt);
++
++			mode &= ~0x59u;		/* EN|IRQ_EN|AUTO_START|DUAL_EN */
++			mode |= 0x22000000u;	/* WDT_MODE_KEY */
++			writel(mode, wdt);
++			iounmap(wdt);
++		}
++	}
  	while (1) {
  #if defined(CONFIG_POWER_EXT)
  		/* EVB */
@@ -80,15 +102,37 @@ index 55d720870..3b15eceaf 100644
  	}
  }
 diff --git a/drivers/misc/mediatek/rtc/mtk_rtc_common.c b/drivers/misc/mediatek/rtc/mtk_rtc_common.c
-index f9baf2db4..f8c79cf4a 100755
+index f9baf2db4..ff1330de4 100755
 --- a/drivers/misc/mediatek/rtc/mtk_rtc_common.c
 +++ b/drivers/misc/mediatek/rtc/mtk_rtc_common.c
-@@ -520,28 +520,17 @@ void mt_power_off(void)
+@@ -11,6 +11,7 @@
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
+ #include <linux/pm.h>
++#include <linux/io.h>
+ #include <linux/delay.h>
+ #include <linux/init.h>
+ #include <linux/module.h>
+@@ -520,28 +521,31 @@ void mt_power_off(void)
  	/* pull PWRBB low */
  	rtc_bbpu_power_down();
  
 +	/* Patched for a reliable power-off: do NOT reboot when a charger is
-+	 * connected. Keep requesting the PMIC power-down and spin instead. */
++	 * connected. Disable the MTK watchdog first (toprgu @ 0x10007000): it
++	 * is kicked from userspace, which stops here, and would otherwise
++	 * reset the SoC ~25s later. Then keep pulling PWRBB low and spin. */
++	{
++		void __iomem *wdt = ioremap(0x10007000, 0x1000);
++
++		if (wdt) {
++			u32 mode = readl(wdt);
++
++			mode &= ~0x59u;		/* EN|IRQ_EN|AUTO_START|DUAL_EN */
++			mode |= 0x22000000u;	/* WDT_MODE_KEY */
++			writel(mode, wdt);
++			iounmap(wdt);
++		}
++	}
  	while (1) {
  #if defined(CONFIG_POWER_EXT)
  		/* EVB */

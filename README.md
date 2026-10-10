@@ -277,6 +277,9 @@ fastboot oem reboot-recovery
   `arch_reset`＝再起動**する実装。そのため `kernel/ct-next-kernel.patch` でこの分岐を削除した**カスタムカーネル**を
   `kernel/build-kernel.sh` で作り、`kernel/pack-recovery.py` で recovery イメージに組み込んで使う。
   これにより充電器を挿したままでも `poweroff` で再起動せず電源断する（実機で確認）。
+  さらに `mt_power_off()` では **MTK WDT（toprgu @ 0x10007000）も無効化**している。これはユーザ空間が
+  `/dev/watchdog` 経由で蹴っているウォッチドッグで、放置すると poweroff の約25秒後にリセット＝再起動して
+  しまうため（`WDT_MODE` の enable / reset ビットを落とす）。
   （このセッションは手動起動で logind セッションが無いため `loginctl poweroff` は elogind に無視される。
   GNOME の電源メニューも systemd 依存で無効。代わりに `pkexec /usr/local/bin/ct-next-power {poweroff,reboot}`
   を使う Shutdown/Reboot ランチャーを同梱し、`ct-next-power.policy` でパスワード不要にしている）
