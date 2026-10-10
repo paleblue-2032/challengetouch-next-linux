@@ -243,3 +243,30 @@ index e82f7950d..60ede5ded 100644
  static const struct snd_soc_component_driver mt8168_adsp_pcm_dai_comp_drv = {
  	.name = "mt8168-adsp-pcm-dai",
  	.dapm_widgets = mt8168_adsp_pcm_widgets,
+diff --git a/sound/soc/mediatek/mt8168/mt8168-afe-pcm.c b/sound/soc/mediatek/mt8168/mt8168-afe-pcm.c
+index 820f72dce..e4a734019 100644
+--- a/sound/soc/mediatek/mt8168/mt8168-afe-pcm.c
++++ b/sound/soc/mediatek/mt8168/mt8168-afe-pcm.c
+@@ -1952,6 +1952,22 @@ int mt8168_afe_fe_trigger(struct snd_pcm_substream *substream, int cmd,
+ 	switch (cmd) {
+ 	case SNDRV_PCM_TRIGGER_START:
+ 	case SNDRV_PCM_TRIGGER_RESUME:
++		/* Patched: this system has no audio HAL to start the codec
++		 * backend (ADDA -> MT6357), so the speaker never receives audio.
++		 * Run the backend's prepare/enable sequence (what
++		 * mt8168_afe_int_adda_prepare() would do) from the DL1 frontend
++		 * trigger. */
++		if (dai_id == MT8168_AFE_MEMIF_DL1 &&
++		    substream->runtime && substream->runtime->rate) {
++			const unsigned int rate = substream->runtime->rate;
++			const int width =
++				snd_pcm_format_width(substream->runtime->format);
++
++			mt8168_afe_set_adda_out(afe, rate);
++			mt8168_afe_set_i2s_out(afe, rate, width);
++			mt8168_afe_set_adda_out_enable(afe, true);
++			mt8168_afe_set_i2s_out_enable(afe, true);
++		}
+ 		/* enable channel merge */
+ 		if (dai_id == MT8168_AFE_MEMIF_VUL2 &&
+ 		    !ctrl_data->bypass_cm1) {

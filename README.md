@@ -291,12 +291,20 @@ fastboot oem reboot-recovery
   手元のカーネル木には `wlan/adaptor` の3ファイルしか含まれていない（`connectivity/Makefile` が
   `CONFIG_WLAN_DRV_BUILD_IN` で外部ツリーを参照する作り）。加えて WiFi ファーム（ROM patch / NVRAM）も必要で、
   これらが揃わない限り有効化できない。現在のネットワークは **USB RNDIS（10.0.0.2 / NAT）経由のみ**。
-- **スピーカー**: 外付けアンプ（GPIO 120/121）を DAPM 経由で有効化する。素の Linux では音量経路の
-  スイッチが既定 OFF で音が出ないため、`work/device/etc/asound.state` に「鳴る状態」を保存し、
-  `ct-next-boot` が起動時に `alsactl restore` で適用する。
-  経路は `DL1 → I05/I06 → O03/O04 → INT ADDA → MT6357 → AU_HP → HP_x Spk Output → HP Spk Amp1`。
-  ADSP のミキサコントロール（`VA Beamforming` 等）は ADSP 未起動で読めず、1つでも読めないと
-  `amixer`/`alsactl` がカード全体を読めなくなるため、`mt8168-adsp-pcm.c` 側で登録を外している。
+- **スピーカー（未完成 / 研究中）**: スピーカーは外付けアンプ（GPIO 120/121）駆動で、有効化は DAPM の
+  `HP Spk Amp1` イベント。経路は `DL1 → I05/I06 → O03/O04 → INT ADDA → MT6357 → AU_HP → HP_x Spk Output
+  → HP Spk Amp1`。現状:
+  - DAPM 経路の通電・アンプ GPIO の HIGH・コーデックのスイッチ/ゲインは確認済み。鳴る状態は
+    `work/device/etc/asound.state` に保存し、`ct-next-boot` が起動時に `alsactl restore` で適用する。
+  - `DL1 → I05/I06 → O03/O04` のクロスバー（`AFE_CONN3` bit5 / `AFE_CONN4` bit6）も入っている。
+  - ただし **AFE→PMIC(コーデック) のダウンリンク（MTKAIF）が動かず**（`AFE_UL_DL_CON0=0x0`,
+    `MTKAIF_MON0=0x0`）、**まだ音は出ない**。MTK の AFE ウィジェット群がカードの DAPM から給電されない
+    ためで、Android 音声HAL が行う ADDA 側の結線/ソース選択を再現できていない。
+  - `kernel/ct-next-kernel.patch` に実験的な対処（FE(DL1)トリガからの ADDA 設定、`mt8168-adsp-pcm.c` の
+    ADSP コントロール登録解除）を含むが、鳴るまでには至っていない。
+  - 次の一手: Android の vendor パーティションから音声HALの設定を読み、その値をカーネル側で適用する。
+  - なお ADSP のミキサコントロール（`VA Beamforming` 等）は ADSP 未起動で読めず、1つでも読めないと
+    `amixer`/`alsactl` がカード全体を読めなくなるため、登録を外している。
 - 別ディストロ: 永続化は SD 上に tarball 展開する方式。`init` の `tar xzf /alpine.tar.gz` を
   別 distro の tarball に差し替えれば入れ替え可能。
 
