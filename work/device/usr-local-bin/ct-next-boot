@@ -188,14 +188,16 @@ if ! pgrep -x elogind >/dev/null 2>&1; then
 	setsid /usr/libexec/elogind/elogind >/dev/null 2>&1 &
 	log "elogind started"
 fi
-# There is no logind session, so polkit cannot see "ct-next" as active and the
-# GNOME Users panel stays locked. Allow ct-next to manage accounts without auth.
+# There is no logind session, so polkit cannot see "alpine" as active: the
+# GNOME Users panel stays locked and `loginctl poweroff`/`reboot` fail with
+# "Interactive authentication required". Allow both for the desktop user.
 # (written before polkitd starts so it is loaded.)
 mkdir -p /etc/polkit-1/rules.d
 cat > /etc/polkit-1/rules.d/49-ct-next-accounts.rules <<'RULES'
 polkit.addRule(function(action, subject) {
     if ((action.id.indexOf("org.freedesktop.accounts.") === 0 ||
-         action.id.indexOf("org.gnome.controlcenter.user-accounts.") === 0) &&
+         action.id.indexOf("org.gnome.controlcenter.user-accounts.") === 0 ||
+         action.id.indexOf("org.freedesktop.login1.") === 0) &&
         subject.user === "alpine") {
         return polkit.Result.YES;
     }

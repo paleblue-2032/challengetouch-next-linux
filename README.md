@@ -277,7 +277,9 @@ fastboot oem reboot-recovery
   `arch_reset`＝再起動**する実装。そのため `kernel/ct-next-kernel.patch` でこの分岐を削除した**カスタムカーネル**を
   `kernel/build-kernel.sh` で作り、`kernel/pack-recovery.py` で recovery イメージに組み込んで使う。
   これにより充電器を挿したままでも `poweroff` で再起動せず電源断する（実機で確認）。
-  （GNOME の電源メニューは systemd 依存で無効。`loginctl` を使う Shutdown/Reboot ランチャーを同梱）
+  （GNOME の電源メニューは systemd 依存で無効。`loginctl` を使う Shutdown/Reboot ランチャーを同梱し、
+  `49-ct-next-accounts.rules` で `org.freedesktop.login1.*` を alpine に許可して "Interactive
+  authentication required" を回避している）
 - `boot` (p14) への転用は不可: boot スロットでは自作 initramfs（ramdisk）が実行されず Android が起動する（検証済み）。
 - 別ディストロ: 永続化は SD 上に tarball 展開する方式。`init` の `tar xzf /alpine.tar.gz` を
   別 distro の tarball に差し替えれば入れ替え可能。
