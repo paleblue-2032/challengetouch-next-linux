@@ -274,15 +274,17 @@ fastboot oem reboot-recovery
 - **横表示は不可**: このカーネルは fbdev のみ。`fb0` の `var.rotate` は解像度を入れ替えるだけで走査は回らず、
   X の fbdev `Rotate` も破綻する（90°回転はディスプレイ HW/MTK disp 側が必要で fbdev からは不可）。縦で運用。
 - **電源OFF**: 純正カーネルの `mt_power_off()`（`mtk_rtc_common.c` / `mt6358_misc.c`）は、**充電器(USB/AC)接続中は
-  `arch_reset`＝再起動**する実装。そのため `kernel/ct-next-kernel.patch` でこの分岐を削除した**カスタムカーネル**を
-  `kernel/build-kernel.sh` で作り、`kernel/pack-recovery.py` で recovery イメージに組み込んで使う。
-  これにより充電器を挿したままでも `poweroff` で再起動せず電源断する（実機で確認）。
-  さらに `mt_power_off()` では **MTK WDT（toprgu @ 0x10007000）も無効化**している。これはユーザ空間が
-  `/dev/watchdog` 経由で蹴っているウォッチドッグで、放置すると poweroff の約25秒後にリセット＝再起動して
-  しまうため（`WDT_MODE` の enable / reset ビットを落とす）。
-  （このセッションは手動起動で logind セッションが無いため `loginctl poweroff` は elogind に無視される。
-  GNOME の電源メニューも systemd 依存で無効。代わりに `pkexec /usr/local/bin/ct-next-power {poweroff,reboot}`
-  を使う Shutdown/Reboot ランチャーを同梱し、`ct-next-power.policy` でパスワード不要にしている）
+  `arch_reset`＝再起動**する実装。`kernel/ct-next-kernel.patch` はこの分岐を削除し、あわせて MTK WDT
+  （toprgu @ 0x10007000、ユーザ空間が `/dev/watchdog` を蹴る方式）も無効化した**カスタムカーネル**を作る
+  （WDT を止めないと poweroff の約25秒後にリセットされ、消えた直後に再起動してしまうため）。
+  - **充電器を挿していない場合**: `poweroff` で正常に電源断する。
+  - **充電器を挿したままの場合**: いったん電源断するが、**しばらくすると勝手に起動し直す**。
+    PMIC / 充電まわりの**ハードウェア側の挙動**で、カーネル側では回避できなかった（純正実装が
+    充電器検出時に `arch_reset` しているのも同じ理由）。
+    → **確実に電源を切りたいときは、USB を抜いてから `poweroff` する**。
+  - このセッションは手動起動で logind セッションが無いため `loginctl poweroff` は elogind に無視される。
+    GNOME の電源メニューも systemd 依存で無効。代わりに `pkexec /usr/local/bin/ct-next-power {poweroff,reboot}`
+    を使う Shutdown/Reboot ランチャーを同梱し、`ct-next-power.policy` でパスワード不要にしている。
 - `boot` (p14) への転用は不可: boot スロットでは自作 initramfs（ramdisk）が実行されず Android が起動する（検証済み）。
 - 別ディストロ: 永続化は SD 上に tarball 展開する方式。`init` の `tar xzf /alpine.tar.gz` を
   別 distro の tarball に差し替えれば入れ替え可能。
