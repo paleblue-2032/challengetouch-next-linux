@@ -286,6 +286,17 @@ fastboot oem reboot-recovery
     GNOME の電源メニューも systemd 依存で無効。代わりに `pkexec /usr/local/bin/ct-next-power {poweroff,reboot}`
     を使う Shutdown/Reboot ランチャーを同梱し、`ct-next-power.policy` でパスワード不要にしている。
 - `boot` (p14) への転用は不可: boot スロットでは自作 initramfs（ramdisk）が実行されず Android が起動する（検証済み）。
+- **内蔵 WiFi (CONSYS_8168) は未対応**: ドライバはカーネル木に入っておらず、MTK の別リポジトリ
+  （`vendor/mediatek/kernel_modules/connectivity/{common,wlan/core/gen4m}`）の **out-of-tree モジュール**。
+  手元のカーネル木には `wlan/adaptor` の3ファイルしか含まれていない（`connectivity/Makefile` が
+  `CONFIG_WLAN_DRV_BUILD_IN` で外部ツリーを参照する作り）。加えて WiFi ファーム（ROM patch / NVRAM）も必要で、
+  これらが揃わない限り有効化できない。現在のネットワークは **USB RNDIS（10.0.0.2 / NAT）経由のみ**。
+- **スピーカー**: 外付けアンプ（GPIO 120/121）を DAPM 経由で有効化する。素の Linux では音量経路の
+  スイッチが既定 OFF で音が出ないため、`work/device/etc/asound.state` に「鳴る状態」を保存し、
+  `ct-next-boot` が起動時に `alsactl restore` で適用する。
+  経路は `DL1 → I05/I06 → O03/O04 → INT ADDA → MT6357 → AU_HP → HP_x Spk Output → HP Spk Amp1`。
+  ADSP のミキサコントロール（`VA Beamforming` 等）は ADSP 未起動で読めず、1つでも読めないと
+  `amixer`/`alsactl` がカード全体を読めなくなるため、`mt8168-adsp-pcm.c` 側で登録を外している。
 - 別ディストロ: 永続化は SD 上に tarball 展開する方式。`init` の `tar xzf /alpine.tar.gz` を
   別 distro の tarball に差し替えれば入れ替え可能。
 
