@@ -112,13 +112,15 @@ Categories=System;
 DESK
 
 # Power menu launchers. GNOME's own power actions go through systemd (absent
-# here), so provide explicit ones that use elogind (loginctl).
+# here), and loginctl/elogind does nothing because this session is started by
+# hand (elogind sees no session). Use the pkexec helper instead: polkit
+# authorises it without a password via ct-next-power.policy.
 cat > /usr/share/applications/ct-next-shutdown.desktop <<'DESK'
 [Desktop Entry]
 Type=Application
 Name=Shutdown
-Comment=Power off (elogind)
-Exec=loginctl poweroff
+Comment=Power off
+Exec=pkexec /usr/local/bin/ct-next-power poweroff
 Icon=system-shutdown
 Categories=System;
 DESK
@@ -126,8 +128,8 @@ cat > /usr/share/applications/ct-next-reboot.desktop <<'DESK'
 [Desktop Entry]
 Type=Application
 Name=Reboot
-Comment=Restart (elogind)
-Exec=loginctl reboot
+Comment=Restart
+Exec=pkexec /usr/local/bin/ct-next-power reboot
 Icon=system-reboot
 Categories=System;
 DESK

@@ -1,0 +1,12 @@
+#!/bin/sh
+# Power the tablet off, or reboot it. Runs as root through pkexec (see
+# /usr/share/polkit-1/actions/ct-next-power.policy), so the desktop user can
+# shut down without a password. `loginctl` cannot be used here: this session
+# is started by hand, so elogind sees no session and silently does nothing.
+#
+# usage: ct-next-power [poweroff|reboot]
+sync
+case "$1" in
+	reboot) exec /bin/busybox reboot -f ;;
+	*)      exec /bin/busybox poweroff -f ;;
+esac
