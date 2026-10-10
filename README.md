@@ -107,12 +107,17 @@ microSD（ext4 1 パーティション）、同梱の `twrp/a05ba-tate.img`。
 bash work/make_alpine_base.sh                      # ネットから Alpine を取得
 # bash work/make_alpine_base.sh /path/base.tar.gz  # 手元の base を使う場合
 
-# 2. initramfs と起動イメージをビルド
+# 2. カーネル（電源OFF修正版）+ initramfs から起動イメージをビルド
+git clone https://github.com/coara-chocomaru/mt8168_a05ba_kernel a05ba-kernel
+bash kernel/build-kernel.sh
 nix-shell -p cpio gzip --run '
   cd work/initramfs-root &&
   cp -f ../busybox-aarch64 bin/busybox && chmod 755 bin/busybox init &&
   find . -print0 | cpio --null -o -H newc --owner=0:0 2>/dev/null | gzip -9 > ../initramfs_alpine_v9.cpio.gz'
-bash build_linux_img.sh work/initramfs_alpine_v9.cpio.gz twrp/a05ba-tate.img work/linux_v10.img
+cat a05ba-kernel/build/src/kernel/mediatek/mt8168/4.14/arch/arm64/boot/Image.gz \
+    next_appended.dtb > /tmp/kernel_with_dtb
+python3 kernel/pack-recovery.py /tmp/kernel_with_dtb \
+    work/initramfs_alpine_v9.cpio.gz twrp/a05ba-tate.img work/linux_v10.img
 
 # 3. recovery スロットへ焼く（boot/Android は消さない）
 adb reboot bootloader
@@ -213,7 +218,13 @@ nix-shell -p cpio gzip --run '
   find . -print0 | cpio --null -o -H newc --owner=0:0 2>/dev/null | gzip -9 > ../initramfs_alpine_v9.cpio.gz'
 
 # 起動イメージ = TWRP ベース + 上記 ramdisk（dtbo/AVB フッターは保持される）
+#   ramdisk だけ差し替える場合（純正カーネルのまま）:
 bash build_linux_img.sh work/initramfs_alpine_v9.cpio.gz twrp/a05ba-tate.img work/linux_v10.img
+#   カーネルごと差し替える場合（電源OFF修正版）:
+cat a05ba-kernel/build/src/kernel/mediatek/mt8168/4.14/arch/arm64/boot/Image.gz \
+    next_appended.dtb > /tmp/kernel_with_dtb
+python3 kernel/pack-recovery.py /tmp/kernel_with_dtb \
+    work/initramfs_alpine_v9.cpio.gz twrp/a05ba-tate.img work/linux_v10.img
 ```
 
 焼き方:
