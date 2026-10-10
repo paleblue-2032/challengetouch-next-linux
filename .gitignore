@@ -21,7 +21,7 @@
 /work/*
 !/work/device/
 !/work/initramfs-root/
-!/work/linux_v9.img
+!/work/linux_v10.img
 !/work/initramfs_alpine_v9.cpio.gz
 !/work/busybox-aarch64
 !/work/make_alpine_base.sh

@@ -76,12 +76,13 @@ Android を消さずに **recovery スロットへ自作 Linux を焼いて起�
 ├── next.dts / dtbo_next.dts  … Next の DTS / DTBO ソース
 ├── next_appended.dtb         … カーネルに付ける DTB
 ├── kernel_Image.gz           … 純正カーネル blob（boot イメージ組み立て用）
+├── kernel/                   … 電源OFF修正版カーネルのパッチ・ビルド・梱包スクリプト
 ├── twrp/                     … ベースにする TWRP イメージ（a05ba-tate.img のみ追跡）
 └── work/
     ├── make_alpine_base.sh   … ★ Alpine ベース + work/device を alpine.tar.gz にビルド
     ├── initramfs-root/       … ★ initramfs のステージング（init + alpine.tar.gz）
     ├── initramfs_alpine_v9.cpio.gz … ★ ビルド済み initramfs（現行 v9）
-    ├── linux_v9.img          … ★ 現行の起動イメージ（recovery へ焼く実体）
+    ├── linux_v10.img          … ★ 現行の起動イメージ（recovery へ焼く実体）
     ├── busybox-aarch64       … initramfs に同梱する静的 busybox
     ├── device/               … ★ SD rootfs に置く設定一式
     │   ├── etc/X11/…         … X 設定（fbdev / タッチ変換行列）
@@ -111,11 +112,11 @@ nix-shell -p cpio gzip --run '
   cd work/initramfs-root &&
   cp -f ../busybox-aarch64 bin/busybox && chmod 755 bin/busybox init &&
   find . -print0 | cpio --null -o -H newc --owner=0:0 2>/dev/null | gzip -9 > ../initramfs_alpine_v9.cpio.gz'
-bash build_linux_img.sh work/initramfs_alpine_v9.cpio.gz twrp/a05ba-tate.img work/linux_v9.img
+bash build_linux_img.sh work/initramfs_alpine_v9.cpio.gz twrp/a05ba-tate.img work/linux_v10.img
 
 # 3. recovery スロットへ焼く（boot/Android は消さない）
 adb reboot bootloader
-fastboot flash recovery work/linux_v9.img
+fastboot flash recovery work/linux_v10.img
 fastboot oem reboot-recovery
 
 # 4. ホスト側ネット設定（端末を起動するたびに 1 回）
@@ -133,6 +134,31 @@ work/ssh.sh /usr/local/bin/ct-next-android
 > 初回起動の時点で RNDIS ネット＋SSH が上がります。SSH が不通のときは ACM シリアル
 > （`/dev/ttyACM0`、`work/serial_*.py`）で入れます。パッケージ一覧は
 > `work/device/usr-local-bin/ct-next-provision` に集約しています。
+
+## カーネルから作る（電源OFF修正）
+
+純正カーネルは充電器接続中の `poweroff` を再起動にしてしまうため、`mt_power_off()` の当該分岐を削除した
+カーネルを自前でビルドします（`kernel/` 以下に一式）。
+
+```sh
+# 1. カーネルソースを取得（「リポジトリに含まれないもの」参照）
+git clone https://github.com/coara-chocomaru/mt8168_a05ba_kernel a05ba-kernel
+
+# 2. パッチ適用 + ビルド（nix のクロス GCC。初回は時間がかかります）
+bash kernel/build-kernel.sh
+#  -> a05ba-kernel/build/src/kernel/mediatek/mt8168/4.14/arch/arm64/boot/Image.gz
+
+# 3. 起動イメージへ再パック（自作カーネル + initramfs を TWRP ベースに載せる）
+cat a05ba-kernel/build/src/kernel/mediatek/mt8168/4.14/arch/arm64/boot/Image.gz \
+    next_appended.dtb > /tmp/kernel_with_dtb
+python3 kernel/pack-recovery.py /tmp/kernel_with_dtb \
+    work/initramfs_alpine_v9.cpio.gz twrp/a05ba-tate.img work/linux_v10.img
+
+# 4. 焼く（後述の「焼き方」と同じ）
+```
+
+`kernel/ct-next-kernel.patch` には電源OFF修正に加え、旧カーネルを新しい GCC でビルドするための
+Makefile 調整（`-Werror` 除去、`$(src)` の include 追加 等）も含まれます。
 
 ## 使い方（Linux を起動して入る）
 
@@ -187,20 +213,20 @@ nix-shell -p cpio gzip --run '
   find . -print0 | cpio --null -o -H newc --owner=0:0 2>/dev/null | gzip -9 > ../initramfs_alpine_v9.cpio.gz'
 
 # 起動イメージ = TWRP ベース + 上記 ramdisk（dtbo/AVB フッターは保持される）
-bash build_linux_img.sh work/initramfs_alpine_v9.cpio.gz twrp/a05ba-tate.img work/linux_v9.img
+bash build_linux_img.sh work/initramfs_alpine_v9.cpio.gz twrp/a05ba-tate.img work/linux_v10.img
 ```
 
 焼き方:
 
 ```sh
 # 方法A: Linux 稼働中に recovery パーティション (p15) へ直接書く（速い）
-work/ssh.sh 'cat > /root/linux_v9.img' < work/linux_v9.img
-work/ssh.sh 'dd if=/root/linux_v9.img of=/dev/mmcblk0p15 bs=1M; sync; rm /root/linux_v9.img'
+work/ssh.sh 'cat > /root/linux_v10.img' < work/linux_v10.img
+work/ssh.sh 'dd if=/root/linux_v10.img of=/dev/mmcblk0p15 bs=1M; sync; rm /root/linux_v10.img'
 bash boot_recovery.sh
 
 # 方法B: fastboot 経由
 adb reboot bootloader
-fastboot flash recovery work/linux_v9.img
+fastboot flash recovery work/linux_v10.img
 fastboot oem reboot-recovery
 ```
 
@@ -236,8 +262,10 @@ fastboot oem reboot-recovery
 - 未実施: 物理的な電源ボタン OFF→ON、タッチ回転方向の最終確定（`ct-next-touch`）、日本語UI（`-lang`）。
 - **横表示は不可**: このカーネルは fbdev のみ。`fb0` の `var.rotate` は解像度を入れ替えるだけで走査は回らず、
   X の fbdev `Rotate` も破綻する（90°回転はディスプレイ HW/MTK disp 側が必要で fbdev からは不可）。縦で運用。
-- **電源OFF**: MTK の `mt_power_off()`（`mtk_rtc_common.c`）は、**充電器(USB/AC)接続中は `arch_reset`＝再起動**する実装。
-  よって充電を挿したままでは GUI でも `poweroff`/`loginctl poweroff` でも消えない → **USB を抜いてから**電源OFF する。
+- **電源OFF**: 純正カーネルの `mt_power_off()`（`mtk_rtc_common.c` / `mt6358_misc.c`）は、**充電器(USB/AC)接続中は
+  `arch_reset`＝再起動**する実装。そのため `kernel/ct-next-kernel.patch` でこの分岐を削除した**カスタムカーネル**を
+  `kernel/build-kernel.sh` で作り、`kernel/pack-recovery.py` で recovery イメージに組み込んで使う。
+  これにより充電器を挿したままでも `poweroff` で再起動せず電源断する（実機で確認）。
   （GNOME の電源メニューは systemd 依存で無効。`loginctl` を使う Shutdown/Reboot ランチャーを同梱）
 - `boot` (p14) への転用は不可: boot スロットでは自作 initramfs（ramdisk）が実行されず Android が起動する（検証済み）。
 - 別ディストロ: 永続化は SD 上に tarball 展開する方式。`init` の `tar xzf /alpine.tar.gz` を

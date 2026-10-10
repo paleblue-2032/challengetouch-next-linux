@@ -1,0 +1,132 @@
+diff --git a/Makefile b/Makefile
+index 74dd7b82f..a832fa93a 100644
+--- a/Makefile
++++ b/Makefile
+@@ -419,7 +419,7 @@ KBUILD_AFLAGS   := -D__ASSEMBLY__
+ KBUILD_CFLAGS   := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
+ 		   -fno-strict-aliasing -fno-common -fshort-wchar \
+ 		   -Werror-implicit-function-declaration \
+-		   -Werror -Wno-format-security \
++		   -Wno-format-security \
+ 		   -std=gnu89
+ KBUILD_CPPFLAGS := -D__KERNEL__
+ KBUILD_AFLAGS_KERNEL :=
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index 4424ad312..7bc42ac01 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -137,7 +137,8 @@ KASAN_SHADOW_OFFSET := $(shell printf "0x%08x00000000\n" $$(( \
+ 
+ export	TEXT_OFFSET GZFLAGS
+ 
+-subdir-ccflags-y += -Werror
++# -Werror disabled to build this old kernel with a modern toolchain
++# subdir-ccflags-y += -Werror
+ 
+ core-y		+= arch/arm64/kernel/ arch/arm64/mm/
+ core-$(CONFIG_NET) += arch/arm64/net/
+diff --git a/drivers/devfreq/Makefile b/drivers/devfreq/Makefile
+index bc1d689a6..9d365c63d 100644
+--- a/drivers/devfreq/Makefile
++++ b/drivers/devfreq/Makefile
+@@ -12,6 +12,7 @@ obj-$(CONFIG_ARM_EXYNOS_BUS_DEVFREQ)	+= exynos-bus.o
+ obj-$(CONFIG_ARM_RK3399_DMC_DEVFREQ)	+= rk3399_dmc.o
+ obj-$(CONFIG_ARM_TEGRA_DEVFREQ)		+= tegra-devfreq.o
+ 
++ccflags-y += -I$(srctree)/drivers/devfreq
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/base/power/include/
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include/
+diff --git a/drivers/misc/mediatek/aee/mrdump/Makefile b/drivers/misc/mediatek/aee/mrdump/Makefile
+index a806a0e59..c37fb5ceb 100644
+--- a/drivers/misc/mediatek/aee/mrdump/Makefile
++++ b/drivers/misc/mediatek/aee/mrdump/Makefile
+@@ -12,6 +12,7 @@
+ #
+ 
+ subdir-ccflags-y += -Idrivers/misc/mediatek/mtprof/
++subdir-ccflags-y += -I$(src)
+ 
+ ccflags-$(CONFIG_MTK_AEE_IPANIC) += -DTEXT_OFFSET=$(TEXT_OFFSET)
+ obj-$(CONFIG_MTK_AEE_IPANIC)	+= mrdump.o
+diff --git a/drivers/misc/mediatek/rtc/mt6358_misc.c b/drivers/misc/mediatek/rtc/mt6358_misc.c
+index 55d720870..3b15eceaf 100644
+--- a/drivers/misc/mediatek/rtc/mt6358_misc.c
++++ b/drivers/misc/mediatek/rtc/mt6358_misc.c
+@@ -857,21 +857,16 @@ void mt_power_off(void)
+ 	/* pull PWRBB low */
+ 	PMIC_POWER_HOLD(0);
+ 
++	/* Patched for a reliable power-off: never reboot on charger. */
+ 	while (1) {
+ #if defined(CONFIG_POWER_EXT)
+ 		/* EVB */
+ 		pr_notice("EVB without charger\n");
+ #else
+-		/* Phone */
+-		pr_notice("Phone with charger\n");
+ 		mdelay(100);
+-		pr_notice("arch_reset\n");
+-#ifdef CONFIG_MTK_CHARGER
+-		mtk_chr_is_charger_exist(&exist);
+-		if (exist == 1 || count > 10)
+-			arch_reset(0, "charger");
+-#endif
+-		count++;
++		PMIC_POWER_HOLD(0);
++		(void)exist;
++		(void)count;
+ #endif
+ 	}
+ }
+diff --git a/drivers/misc/mediatek/rtc/mtk_rtc_common.c b/drivers/misc/mediatek/rtc/mtk_rtc_common.c
+index f9baf2db4..f8c79cf4a 100755
+--- a/drivers/misc/mediatek/rtc/mtk_rtc_common.c
++++ b/drivers/misc/mediatek/rtc/mtk_rtc_common.c
+@@ -520,28 +520,17 @@ void mt_power_off(void)
+ 	/* pull PWRBB low */
+ 	rtc_bbpu_power_down();
+ 
++	/* Patched for a reliable power-off: do NOT reboot when a charger is
++	 * connected. Keep requesting the PMIC power-down and spin instead. */
+ 	while (1) {
+ #if defined(CONFIG_POWER_EXT)
+ 		/* EVB */
+ 		rtc_xinfo("EVB without charger\n");
+ #else
+-		/* Phone */
+-		rtc_xinfo("Phone with charger\n");
+ 		mdelay(100);
+-		rtc_xinfo("arch_reset\n");
+-#ifdef CONFIG_MTK_CHARGER
+-		mtk_chr_is_charger_exist(&exist);
+-		if (exist == 1 || count > 10) {
+-			arch_reset(0, "charger");
+-			break;
+-		}
+-#else
+-		if (count > 10) {
+-			arch_reset(0, "charger");
+-			break;
+-		}
+-#endif
+-		count++;
++		rtc_bbpu_power_down();
++		(void)exist;
++		(void)count;
+ #endif
+ 	}
+ }
+diff --git a/scripts/dtc/Makefile b/scripts/dtc/Makefile
+index 0dc922bb7..b54c4a9a4 100644
+--- a/scripts/dtc/Makefile
++++ b/scripts/dtc/Makefile
+@@ -10,7 +10,7 @@ dtc-objs	+= dtc-lexer.lex.o dtc-parser.tab.o
+ 
+ # Source files need to get at the userspace version of libfdt_env.h to compile
+ 
+-HOSTCFLAGS_DTC := -I$(src) -I$(src)/libfdt
++HOSTCFLAGS_DTC := -I$(src) -I$(src)/libfdt -fcommon
+ 
+ HOSTCFLAGS_checks.o := $(HOSTCFLAGS_DTC)
+ HOSTCFLAGS_data.o := $(HOSTCFLAGS_DTC)
